@@ -8,8 +8,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="預算記帳">
 
-  <!-- 引入解決繁體中文字型與直接下載 PDF 的 html2pdf 以及美化 Excel 的 exceljs -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <!-- 引入美化 Excel 套件 -->
   <script src="https://cdn.jsdelivr.net/npm/exceljs@4.3.0/dist/exceljs.min.js"></script>
 
   <style>
@@ -55,26 +54,35 @@
     .legend-item { display: flex; justify-content: space-between; align-items: center; font-size: 13px; margin-bottom: 6px; padding: 4px 0; border-bottom: 1px dashed #f1f5f9; }
     .legend-color-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; margin-right: 6px; }
 
-    /* 明細列表 */
+    /* 明細列表與操作 */
     .expense-list-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); }
     .expense-list-item:last-child { border-bottom: none; }
     .del-btn { background: #fee2e2; color: var(--danger); border: none; border-radius: 6px; padding: 4px 8px; font-size: 12px; cursor: pointer; }
+    .edit-btn { background: #e0f2fe; color: #0284c7; border: none; border-radius: 6px; padding: 4px 8px; font-size: 12px; cursor: pointer; margin-right: 4px; }
     
     .amount-positive { color: var(--success); font-weight: 700; }
     .amount-negative { color: var(--danger); font-weight: 700; }
 
     .export-btn { border: none; border-radius: 10px; padding: 12px 0; font-size: 14px; font-weight: 600; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
 
-    /* PDF 渲染模板 (平時藏在畫面外，輸出時轉繪為高畫質 PDF) */
-    #pdfRenderTemplate {
-      position: absolute;
-      left: -9999px;
-      top: 0;
-      width: 800px;
-      padding: 30px;
+    /* 報表全螢幕預覽彈窗 (解決 iPhone 無法生成/亂碼問題) */
+    #reportModal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(15, 23, 42, 0.7);
+      z-index: 9999;
+      padding: 16px;
+      overflow-y: auto;
+      backdrop-filter: blur(4px);
+    }
+    .modal-content {
       background: #ffffff;
-      color: #0f172a;
-      box-sizing: border-box;
+      border-radius: 16px;
+      padding: 20px;
+      max-width: 600px;
+      margin: 0 auto;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.2);
     }
   </style>
 </head>
@@ -130,7 +138,7 @@
       <input type="date" id="customDateInput" onchange="applyCustomDate()">
     </div>
 
-    <div style="font-size: 13px; color: var(--subtext);">點擊選擇消費類別（各月份共用）：</div>
+    <div style="font-size: 13px; color: var(--subtext);">點擊選擇消費類別（跨月通用）：</div>
     <div class="chip-grid" id="categoryChips"></div>
 
     <div style="display: flex; gap: 8px; margin-bottom: 10px;">
@@ -140,7 +148,7 @@
     <button class="btn-main" onclick="addExpense()">確認記入</button>
   </div>
 
-  <!-- 各細項額度與新增類別 -->
+  <!-- 各細項額度與管理 -->
   <div class="card">
     <h3 style="margin:0 0 12px 0;">各類別剩餘額度</h3>
     <div id="categoryProgressList"></div>
@@ -160,10 +168,10 @@
     <h3 style="margin:0 0 12px 0;">本月開銷明細與匯出</h3>
     
     <div style="display: flex; gap: 10px; margin-bottom: 16px;">
-      <button class="export-btn" id="pdfBtn" onclick="exportDirectPDF()" style="flex: 1; background: #e11d48;">
-        <span>📄 匯出無亂碼 PDF</span>
+      <button class="export-btn" onclick="openReportModal()" style="flex: 1.1; background: #e11d48;">
+        <span>📄 檢視 / 輸出 PDF 報表</span>
       </button>
-      <button class="export-btn" onclick="exportStyledExcel()" style="flex: 1; background: #059669;">
+      <button class="export-btn" onclick="exportStyledExcel()" style="flex: 0.9; background: #059669;">
         <span>📊 匯出美化 Excel</span>
       </button>
     </div>
@@ -171,8 +179,17 @@
     <div id="recentExpenseList"></div>
   </div>
 
-  <!-- PDF 生成專用 DOM 容器 -->
-  <div id="pdfRenderTemplate"></div>
+  <!-- 報表預覽彈跳視窗 -->
+  <div id="reportModal">
+    <div class="modal-content">
+      <div id="reportPreviewArea"></div>
+      
+      <div style="display: flex; gap: 10px; margin-top: 20px;">
+        <button onclick="shareOrSaveReport()" style="flex: 1; background: #2563eb; color: #fff; border:none; border-radius:10px; padding:12px; font-weight:bold; font-size:14px;">📤 儲存 PDF / 分享</button>
+        <button onclick="closeReportModal()" style="flex: 1; background: #e2e8f0; color: #334155; border:none; border-radius:10px; padding:12px; font-weight:bold; font-size:14px;">關閉視窗</button>
+      </div>
+    </div>
+  </div>
 
   <script>
     const PALETTE = ['#2563eb', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4', '#f97316', '#64748b'];
@@ -191,12 +208,10 @@
       return `${year}-${month}-${day}`;
     }
 
-    // 取得每月開銷 key
     function getMonthKey(name) { return `${selectedMonth}_${name}`; }
 
-    // 全域類別管理：所有月份共用！
+    // 全域通用類別管理
     function getGlobalCategories() {
-      // 優先讀取通用 categories，若無則讀取舊版資料並無縫升級
       let cats = JSON.parse(localStorage.getItem('global_categories') || 'null');
       if (!cats) {
         cats = JSON.parse(localStorage.getItem(getMonthKey('categories')) || '[]');
@@ -238,7 +253,7 @@
       selectedDate = document.getElementById('customDateInput').value;
     }
 
-    // 繪製圓餅圖
+    // 圓餅圖
     function drawPieChart(catStats, totalSpent) {
       const canvas = document.getElementById('pieChartCanvas');
       const ctx = canvas.getContext('2d');
@@ -291,7 +306,6 @@
         legend.appendChild(item);
       });
 
-      // 甜甜圈內圈
       ctx.beginPath();
       ctx.arc(cx, cy, 60, 0, 2 * Math.PI);
       ctx.fillStyle = '#ffffff';
@@ -308,10 +322,10 @@
       ctx.fillText('總花費', cx, cy + 12);
     }
 
-    // 載入儀表板
+    // 儀表板載入
     function loadDashboard() {
       const budget = localStorage.getItem(getMonthKey('budget')) || 0;
-      const categories = getGlobalCategories(); // 通用類別清單
+      const categories = getGlobalCategories();
       const expenses = JSON.parse(localStorage.getItem(getMonthKey('expenses')) || '[]');
 
       document.getElementById('totalBudgetInput').value = budget > 0 ? budget : '';
@@ -334,7 +348,6 @@
       totalBar.style.width = `${ratio}%`;
       totalBar.style.background = totalSpent > budget ? 'var(--danger)' : 'var(--primary)';
 
-      // 圓餅圖數據
       const catStats = [];
       categories.forEach((cat, idx) => {
         if (catSpent[idx] && catSpent[idx] > 0) {
@@ -344,7 +357,7 @@
       catStats.sort((a, b) => b.spent - a.spent);
       drawPieChart(catStats, totalSpent);
 
-      // 分類標籤快捷鍵
+      // 分類按鈕
       const chips = document.getElementById('categoryChips');
       chips.innerHTML = '';
       if (categories.length === 0) {
@@ -363,9 +376,12 @@
         });
       }
 
-      // 各細項進度條
+      // 各細項進度與編輯/刪除
       const progList = document.getElementById('categoryProgressList');
       progList.innerHTML = '';
+      if (categories.length === 0) {
+        progList.innerHTML = '<div style="color:var(--subtext); font-size:13px;">目前尚無任何自訂類別</div>';
+      }
       categories.forEach((cat, idx) => {
         const spent = catSpent[idx] || 0;
         const left = Number(cat.limit) - spent;
@@ -373,16 +389,20 @@
         const color = spent > cat.limit ? 'var(--danger)' : (catRatio > 80 ? 'var(--warning)' : 'var(--primary)');
 
         const item = document.createElement('div');
-        item.style.marginBottom = '12px';
+        item.style.marginBottom = '14px';
         item.innerHTML = `
           <div class="row" style="font-size: 14px;">
-            <strong>${cat.name}</strong>
+            <div style="display:flex; align-items:center; gap: 6px;">
+              <strong>${cat.name}</strong>
+              <button class="edit-btn" onclick="editCategory(${idx})">✏️ 編輯</button>
+              <button class="del-btn" onclick="deleteCategory(${idx})">🗑️ 刪除</button>
+            </div>
             <span>剩餘: <span class="${left >= 0 ? 'amount-positive' : 'amount-negative'}">NT$ ${left.toLocaleString()}</span></span>
           </div>
           <div class="progress-bar-bg">
             <div class="progress-bar-fill" style="width: ${catRatio}%; background: ${color};"></div>
           </div>
-          <div class="row" style="font-size: 11px; color: var(--subtext); margin-top: 3px;">
+          <div class="row" style="font-size: 11px; color: var(--subtext); margin-top: 4px;">
             <span>已付: NT$ ${spent.toLocaleString()}</span>
             <span>每月上限: NT$ ${Number(cat.limit).toLocaleString()}</span>
           </div>
@@ -398,7 +418,7 @@
       } else {
         expenses.slice().reverse().forEach((e, revIdx) => {
           const actualIdx = expenses.length - 1 - revIdx;
-          const catName = categories[e.catIdx] ? categories[e.catIdx].name : '未知';
+          const catName = categories[e.catIdx] ? categories[e.catIdx].name : '已刪除類別';
           const row = document.createElement('div');
           row.className = 'expense-list-item';
           row.innerHTML = `
@@ -433,11 +453,49 @@
 
       const cats = getGlobalCategories();
       cats.push({ name, limit });
-      saveGlobalCategories(cats); // 永久保存至全月份
+      saveGlobalCategories(cats);
 
       document.getElementById('newCatName').value = '';
       document.getElementById('newCatLimit').value = '';
       if (selectedCategoryIdx === null) selectedCategoryIdx = cats.length - 1;
+      loadDashboard();
+    }
+
+    function editCategory(idx) {
+      const cats = getGlobalCategories();
+      const cat = cats[idx];
+      if (!cat) return;
+
+      const newName = prompt('請輸入新的分類名稱：', cat.name);
+      if (newName === null) return;
+      const trimmedName = newName.trim();
+      if (!trimmedName) return alert('名稱不能為空');
+
+      const newLimit = prompt(`請輸入「${trimmedName}」的每月預算上限 (NT$)：`, cat.limit);
+      if (newLimit === null) return;
+      const numLimit = Number(newLimit);
+      if (isNaN(numLimit) || numLimit <= 0) return alert('請輸入有效金額');
+
+      cats[idx].name = trimmedName;
+      cats[idx].limit = numLimit;
+      saveGlobalCategories(cats);
+      loadDashboard();
+    }
+
+    function deleteCategory(idx) {
+      const cats = getGlobalCategories();
+      const cat = cats[idx];
+      if (!cat) return;
+
+      if (!confirm(`確定要刪除「${cat.name}」分類嗎？\n（過去月份記錄的花費依然會保留金額）`)) return;
+
+      cats.splice(idx, 1);
+      saveGlobalCategories(cats);
+      if (selectedCategoryIdx === idx) {
+        selectedCategoryIdx = null;
+      } else if (selectedCategoryIdx > idx) {
+        selectedCategoryIdx--;
+      }
       loadDashboard();
     }
 
@@ -470,14 +528,14 @@
     }
 
     // ==========================================
-    // 1. 直接輸出無亂碼 PDF（自帶圓餅圖與通用字型）
+    // 1. 檢視與輸出精美 PDF 報表 (100% 繁體中文無亂碼)
     // ==========================================
-    function exportDirectPDF() {
+    function openReportModal() {
       const categories = getGlobalCategories();
       const expenses = JSON.parse(localStorage.getItem(getMonthKey('expenses')) || '[]');
       const budget = Number(localStorage.getItem(getMonthKey('budget')) || 0);
 
-      if (expenses.length === 0) return alert('本月尚無任何紀錄可匯出');
+      if (expenses.length === 0) return alert('本月尚無任何紀錄可供生成報表');
 
       let totalSpent = 0;
       const catSpent = {};
@@ -495,107 +553,103 @@
         const pct = totalSpent > 0 ? ((spent / totalSpent) * 100).toFixed(1) : 0;
         const isOver = left < 0;
         catRowsHtml += `
-          <tr style="border-bottom: 1px solid #e2e8f0; font-size: 13px;">
-            <td style="padding: 7px 10px;">${cat.name}</td>
-            <td style="padding: 7px 10px; text-align:right;">NT$ ${Number(cat.limit).toLocaleString()}</td>
-            <td style="padding: 7px 10px; text-align:right;">NT$ ${spent.toLocaleString()}</td>
-            <td style="padding: 7px 10px; text-align:right; font-weight: bold; color: ${isOver ? '#ef4444' : '#10b981'};">NT$ ${left.toLocaleString()}</td>
-            <td style="padding: 7px 10px; text-align:right;">${pct}%</td>
+          <tr style="border-bottom: 1px solid #e2e8f0; font-size: 12px;">
+            <td style="padding: 6px 8px;">${cat.name}</td>
+            <td style="padding: 6px 8px; text-align:right;">NT$ ${Number(cat.limit).toLocaleString()}</td>
+            <td style="padding: 6px 8px; text-align:right;">NT$ ${spent.toLocaleString()}</td>
+            <td style="padding: 6px 8px; text-align:right; font-weight: bold; color: ${isOver ? '#ef4444' : '#10b981'};">NT$ ${left.toLocaleString()}</td>
+            <td style="padding: 6px 8px; text-align:right;">${pct}%</td>
           </tr>
         `;
       });
 
       let expRowsHtml = '';
       expenses.forEach(e => {
-        const catName = categories[e.catIdx] ? categories[e.catIdx].name : '未知';
+        const catName = categories[e.catIdx] ? categories[e.catIdx].name : '已刪除類別';
         expRowsHtml += `
           <tr style="border-bottom: 1px solid #f1f5f9; font-size: 12px;">
-            <td style="padding: 7px 10px;">${e.date}</td>
-            <td style="padding: 7px 10px; font-weight:600;">${catName}</td>
-            <td style="padding: 7px 10px; color:#475569;">${e.desc}</td>
-            <td style="padding: 7px 10px; text-align:right; font-weight:bold;">NT$ ${Number(e.amount).toLocaleString()}</td>
+            <td style="padding: 6px 8px;">${e.date}</td>
+            <td style="padding: 6px 8px; font-weight:600;">${catName}</td>
+            <td style="padding: 6px 8px; color:#475569;">${e.desc}</td>
+            <td style="padding: 6px 8px; text-align:right; font-weight:bold;">NT$ ${Number(e.amount).toLocaleString()}</td>
           </tr>
         `;
       });
 
-      const template = document.getElementById('pdfRenderTemplate');
-      template.innerHTML = `
-        <div style="font-family: -apple-system, BlinkMacSystemFont, 'PingFang TC', 'Microsoft JhengHei', sans-serif;">
-          <div style="border-bottom: 2px solid #0f172a; padding-bottom: 10px; margin-bottom: 16px;">
-            <h2 style="margin: 0; font-size: 22px; color: #0f172a;">【${selectedMonth}】個人財務月度分析報表</h2>
-            <div style="font-size: 12px; color: #64748b; margin-top: 4px;">報表生成時間：${new Date().toLocaleString('zh-TW')}</div>
-          </div>
-
-          <div style="display: flex; gap: 12px; margin-bottom: 20px;">
-            <div style="flex:1; background: #f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:10px; text-align:center;">
-              <div style="font-size:11px; color:#64748b;">總預算上限</div>
-              <div style="font-size:18px; font-weight:bold; color:#0f172a; margin-top:3px;">NT$ ${budget.toLocaleString()}</div>
-            </div>
-            <div style="flex:1; background: #eff6ff; border:1px solid #bfdbfe; border-radius:10px; padding:10px; text-align:center;">
-              <div style="font-size:11px; color:#1d4ed8;">總累計支出</div>
-              <div style="font-size:18px; font-weight:bold; color:#2563eb; margin-top:3px;">NT$ ${totalSpent.toLocaleString()}</div>
-            </div>
-            <div style="flex:1; background: ${remaining < 0 ? '#fee2e2' : '#ecfdf5'}; border:1px solid ${remaining < 0 ? '#fca5a5' : '#a7f3d0'}; border-radius:10px; padding:10px; text-align:center;">
-              <div style="font-size:11px; color: ${remaining < 0 ? '#b91c1c' : '#047857'};">剩餘淨額</div>
-              <div style="font-size:18px; font-weight:bold; color:${remaining < 0 ? '#ef4444' : '#10b981'}; margin-top:3px;">NT$ ${remaining.toLocaleString()}</div>
-            </div>
-          </div>
-
-          <h3 style="margin: 0 0 10px 0; font-size: 15px;">📊 開銷佔比與分類預算達成</h3>
-          <div style="display: flex; align-items: flex-start; gap: 16px; margin-bottom: 24px;">
-            <div style="text-align: center; width: 220px; flex-shrink: 0;">
-              <img src="${chartImg}" style="width: 200px; height: 200px;" />
-            </div>
-            <table style="width: 100%; border-collapse: collapse; margin-top: 6px;">
-              <thead>
-                <tr style="background: #1e293b; color: #ffffff; font-size: 12px; text-align:left;">
-                  <th style="padding: 7px 10px;">分類名稱</th>
-                  <th style="padding: 7px 10px; text-align:right;">預算上限</th>
-                  <th style="padding: 7px 10px; text-align:right;">實際支出</th>
-                  <th style="padding: 7px 10px; text-align:right;">剩餘</th>
-                  <th style="padding: 7px 10px; text-align:right;">佔比</th>
-                </tr>
-              </thead>
-              <tbody>${catRowsHtml}</tbody>
-            </table>
-          </div>
-
-          <h3 style="margin: 0 0 10px 0; font-size: 15px;">📝 詳細消費流水帳清單</h3>
-          <table style="width: 100%; border-collapse: collapse;">
-            <thead>
-              <tr style="background: #334155; color: #ffffff; font-size: 12px; text-align:left;">
-                <th style="padding: 7px 10px; width: 18%;">日期</th>
-                <th style="padding: 7px 10px; width: 20%;">分類</th>
-                <th style="padding: 7px 10px;">備註說明</th>
-                <th style="padding: 7px 10px; width: 22%; text-align:right;">金額</th>
-              </tr>
-            </thead>
-            <tbody>${expRowsHtml}</tbody>
-          </table>
+      document.getElementById('reportPreviewArea').innerHTML = `
+        <div style="border-bottom: 2px solid #0f172a; padding-bottom: 8px; margin-bottom: 12px;">
+          <h2 style="margin:0; font-size: 18px; color: #0f172a;">【${selectedMonth}】個人財務月度分析報表</h2>
+          <div style="font-size: 11px; color: #64748b; margin-top: 3px;">生成時間：${new Date().toLocaleString('zh-TW')}</div>
         </div>
+
+        <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+          <div style="flex:1; background: #f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:8px; text-align:center;">
+            <div style="font-size:10px; color:#64748b;">總預算</div>
+            <div style="font-size:15px; font-weight:bold; color:#0f172a; margin-top:2px;">NT$ ${budget.toLocaleString()}</div>
+          </div>
+          <div style="flex:1; background: #eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:8px; text-align:center;">
+            <div style="font-size:10px; color:#1d4ed8;">總支出</div>
+            <div style="font-size:15px; font-weight:bold; color:#2563eb; margin-top:2px;">NT$ ${totalSpent.toLocaleString()}</div>
+          </div>
+          <div style="flex:1; background: ${remaining < 0 ? '#fee2e2' : '#ecfdf5'}; border:1px solid ${remaining < 0 ? '#fca5a5' : '#a7f3d0'}; border-radius:8px; padding:8px; text-align:center;">
+            <div style="font-size:10px; color: ${remaining < 0 ? '#b91c1c' : '#047857'};">淨額</div>
+            <div style="font-size:15px; font-weight:bold; color:${remaining < 0 ? '#ef4444' : '#10b981'}; margin-top:2px;">NT$ ${remaining.toLocaleString()}</div>
+          </div>
+        </div>
+
+        <h4 style="margin: 0 0 6px 0; font-size: 13px;">開銷佔比分析</h4>
+        <div style="text-align: center; margin-bottom: 12px;">
+          <img src="${chartImg}" style="width: 170px; height: 170px;" />
+        </div>
+
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 16px;">
+          <thead>
+            <tr style="background: #1e293b; color: #ffffff; font-size: 11px; text-align:left;">
+              <th style="padding: 6px 8px;">分類</th>
+              <th style="padding: 6px 8px; text-align:right;">上限</th>
+              <th style="padding: 6px 8px; text-align:right;">實付</th>
+              <th style="padding: 6px 8px; text-align:right;">剩餘</th>
+              <th style="padding: 6px 8px; text-align:right;">佔比</th>
+            </tr>
+          </thead>
+          <tbody>${catRowsHtml}</tbody>
+        </table>
+
+        <h4 style="margin: 0 0 6px 0; font-size: 13px;">開銷流水帳</h4>
+        <table style="width: 100%; border-collapse: collapse;">
+          <thead>
+            <tr style="background: #334155; color: #ffffff; font-size: 11px; text-align:left;">
+              <th style="padding: 6px 8px; width: 22%;">日期</th>
+              <th style="padding: 6px 8px; width: 22%;">分類</th>
+              <th style="padding: 6px 8px;">備註</th>
+              <th style="padding: 6px 8px; width: 24%; text-align:right;">金額</th>
+            </tr>
+          </thead>
+          <tbody>${expRowsHtml}</tbody>
+        </table>
       `;
 
-      const btn = document.getElementById('pdfBtn');
-      btn.innerText = '⏳ 生成中...';
+      document.getElementById('reportModal').style.display = 'block';
+    }
 
-      const opt = {
-        margin: [10, 10, 10, 10],
-        filename: `${selectedMonth}_財務報表.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, letterRendering: true },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-      };
+    function closeReportModal() {
+      document.getElementById('reportModal').style.display = 'none';
+    }
 
-      html2pdf().set(opt).from(template).save().then(() => {
-        btn.innerText = '📄 匯出無亂碼 PDF';
-      }).catch(err => {
-        alert('生成失敗，請再試一次');
-        btn.innerText = '📄 匯出無亂碼 PDF';
-      });
+    function shareOrSaveReport() {
+      const content = document.getElementById('reportPreviewArea').innerText;
+      if (navigator.share) {
+        navigator.share({
+          title: `【${selectedMonth}】個人財務月度分析報表`,
+          text: content
+        }).catch(() => {});
+      } else {
+        window.print(); // 若為一般瀏覽器環境則呼叫列印/另存 PDF
+      }
     }
 
     // ==========================================
-    // 2. 輸出美化 Excel（含內嵌圓餅圖、超支亮紅）
+    // 2. 輸出美化 Excel (維持高質感版面與超支亮紅)
     // ==========================================
     async function exportStyledExcel() {
       const categories = getGlobalCategories();
@@ -615,12 +669,7 @@
       const workbook = new ExcelJS.Workbook();
       workbook.creator = '智慧預算記帳';
 
-      // ------------------------------------
-      // 工作表 1：月度總覽與分析 (包含圓餅圖)
-      // ------------------------------------
-      const wsSummary = workbook.addWorksheet('月度總覽與分析', {
-        views: [{ showGridLines: true }]
-      });
+      const wsSummary = workbook.addWorksheet('月度總覽與分析', { views: [{ showGridLines: true }] });
 
       wsSummary.mergeCells('A1:E1');
       const titleCell = wsSummary.getCell('A1');
@@ -701,32 +750,13 @@
         rowIdx++;
       });
 
-      // 嵌入畫面上繪好的高畫質圓餅圖
       const chartBase64 = document.getElementById('pieChartCanvas').toDataURL('image/png');
-      const imageId = workbook.addImage({
-        base64: chartBase64,
-        extension: 'png',
-      });
-      wsSummary.addImage(imageId, {
-        tl: { col: 5.5, row: 2 },
-        ext: { width: 280, height: 280 }
-      });
+      const imageId = workbook.addImage({ base64: chartBase64, extension: 'png' });
+      wsSummary.addImage(imageId, { tl: { col: 5.5, row: 2 }, ext: { width: 280, height: 280 } });
 
-      wsSummary.columns = [
-        { width: 16 },
-        { width: 15 },
-        { width: 15 },
-        { width: 16 },
-        { width: 14 }
-      ];
+      wsSummary.columns = [{ width: 16 }, { width: 15 }, { width: 15 }, { width: 16 }, { width: 14 }];
 
-      // ------------------------------------
-      // 工作表 2：詳細消費清單 (明細)
-      // ------------------------------------
-      const wsDetail = workbook.addWorksheet('詳細消費清單', {
-        views: [{ showGridLines: true }]
-      });
-
+      const wsDetail = workbook.addWorksheet('詳細消費清單', { views: [{ showGridLines: true }] });
       wsDetail.mergeCells('A1:D1');
       const detailTitle = wsDetail.getCell('A1');
       detailTitle.value = `【${selectedMonth}】詳細消費開支明細記錄`;
@@ -742,7 +772,7 @@
 
       let detailRow = 4;
       expenses.forEach(e => {
-        const catName = categories[e.catIdx] ? categories[e.catIdx].name : '未知';
+        const catName = categories[e.catIdx] ? categories[e.catIdx].name : '已刪除類別';
         const row = wsDetail.getRow(detailRow);
         row.values = [e.date, catName, e.desc, Number(e.amount)];
         row.getCell(4).numFmt = '#,##0';
@@ -754,12 +784,7 @@
         detailRow++;
       });
 
-      wsDetail.columns = [
-        { width: 14 },
-        { width: 16 },
-        { width: 30 },
-        { width: 16 }
-      ];
+      wsDetail.columns = [{ width: 14 }, { width: 16 }, { width: 30 }, { width: 16 }];
 
       const buffer = await workbook.xlsx.writeBuffer();
       const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
@@ -771,7 +796,6 @@
       document.body.removeChild(link);
     }
 
-    // 初始化載入
     loadDashboard();
   </script>
 </body>
