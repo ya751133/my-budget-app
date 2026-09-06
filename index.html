@@ -3,18 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>智慧預算記帳</title>
+  <title>智慧預算與財務分析</title>
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="預算記帳">
   <style>
     :root {
-      --primary: #3b82f6;
-      --primary-dark: #1d4ed8;
+      --primary: #2563eb;
+      --primary-light: #eff6ff;
       --danger: #ef4444;
       --warning: #f59e0b;
       --success: #10b981;
-      --bg: #f1f5f9;
+      --bg: #f8fafc;
       --card: #ffffff;
       --text: #0f172a;
       --subtext: #64748b;
@@ -23,41 +23,52 @@
     * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
     body { margin: 0; padding: 16px; background-color: var(--bg); color: var(--text); padding-bottom: 90px; }
     
-    .card { background: var(--card); border-radius: 18px; padding: 16px; margin-bottom: 14px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+    .card { background: var(--card); border-radius: 18px; padding: 18px; margin-bottom: 14px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.04); }
     .row { display: flex; justify-content: space-between; align-items: center; }
     
-    /* 進度條 */
     .progress-bar-bg { width: 100%; height: 10px; background: #e2e8f0; border-radius: 6px; overflow: hidden; margin-top: 8px; }
     .progress-bar-fill { height: 100%; width: 0%; border-radius: 6px; transition: width 0.3s ease; }
     
-    /* 輸入框與基礎按鈕 */
-    input { padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border); font-size: 15px; width: 100%; outline: none; background: #f8fafc; }
+    input { padding: 11px 13px; border-radius: 10px; border: 1px solid var(--border); font-size: 15px; width: 100%; outline: none; background: #f8fafc; }
     input:focus { border-color: var(--primary); background: #fff; }
-    button.btn-main { background: var(--primary); color: #fff; border: none; border-radius: 10px; padding: 12px; font-weight: 600; font-size: 15px; width: 100%; cursor: pointer; }
-    button.btn-main:active { background: var(--primary-dark); }
+    button.btn-main { background: var(--primary); color: #fff; border: none; border-radius: 10px; padding: 13px; font-weight: 600; font-size: 15px; width: 100%; cursor: pointer; }
+    button.btn-main:active { opacity: 0.85; }
     
-    /* 日期快捷選鈕 */
+    /* 日期選鈕 */
     .pill-group { display: flex; gap: 8px; margin-bottom: 12px; }
     .pill-btn { flex: 1; padding: 9px 0; border: 1.5px solid var(--border); background: #fff; border-radius: 10px; font-size: 14px; font-weight: 500; text-align: center; color: var(--subtext); cursor: pointer; }
-    .pill-btn.active { border-color: var(--primary); background: #eff6ff; color: var(--primary); font-weight: 700; }
+    .pill-btn.active { border-color: var(--primary); background: var(--primary-light); color: var(--primary); font-weight: 700; }
     
-    /* 分類標籤按鈕區 */
+    /* 分類標籤 */
     .chip-grid { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 14px 0; }
     .chip-btn { padding: 8px 14px; border: 1.5px solid var(--border); border-radius: 20px; font-size: 14px; background: #fff; color: var(--text); cursor: pointer; }
     .chip-btn.active { border-color: var(--primary); background: var(--primary); color: #fff; font-weight: 600; }
     
+    /* 圓餅圖與圖例容器 */
+    .chart-container { display: flex; flex-direction: column; align-items: center; margin: 12px 0; }
+    .chart-legend { width: 100%; margin-top: 14px; }
+    .legend-item { display: flex; justify-content: space-between; align-items: center; font-size: 13px; margin-bottom: 6px; padding: 4px 0; border-bottom: 1px dashed #f1f5f9; }
+    .legend-color-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+
     /* 明細列表 */
     .expense-list-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); }
     .expense-list-item:last-child { border-bottom: none; }
-    .del-btn { background: #fee2e2; color: var(--danger); border: none; border-radius: 6px; padding: 4px 8px; font-size: 12px; margin-left: 8px; cursor: pointer; }
+    .del-btn { background: #fee2e2; color: var(--danger); border: none; border-radius: 6px; padding: 4px 8px; font-size: 12px; cursor: pointer; }
     
     .amount-positive { color: var(--success); font-weight: 700; }
     .amount-negative { color: var(--danger); font-weight: 700; }
+
+    /* 美化列印報表樣式（螢幕不可見，按列印時呈現） */
+    @media print {
+      body * { visibility: hidden; }
+      #printReportArea, #printReportArea * { visibility: visible; }
+      #printReportArea { position: absolute; left: 0; top: 0; width: 100%; padding: 24px; background: #fff; }
+    }
   </style>
 </head>
 <body>
 
-  <!-- 月份與總預算設定 -->
+  <!-- 月份與總預算 -->
   <div class="card">
     <div class="row">
       <h3 style="margin:0;">📅 月份</h3>
@@ -73,7 +84,7 @@
     </div>
 
     <div class="row" style="margin-top: 14px; font-size: 14px;">
-      <span>已花費 / 預算</span>
+      <span>已花費 / 總上限</span>
       <span id="totalSummary" style="font-weight: 600;">NT$ 0 / NT$ 0</span>
     </div>
     <div class="progress-bar-bg">
@@ -85,58 +96,74 @@
     </div>
   </div>
 
-  <!-- 新增消費區塊 -->
+  <!-- 圓餅圖比例分析 -->
+  <div class="card">
+    <h3 style="margin:0 0 8px 0;">📊 開銷佔比分析</h3>
+    <div class="chart-container">
+      <canvas id="pieChartCanvas" width="220" height="220"></canvas>
+      <div class="chart-legend" id="chartLegendList"></div>
+    </div>
+  </div>
+
+  <!-- 新增消費 -->
   <div class="card">
     <h3 style="margin:0 0 12px 0;">記一筆開支</h3>
 
-    <!-- 日期選擇按鈕 -->
     <div class="pill-group">
       <div class="pill-btn active" id="date-today" onclick="setDateOption('today')">今天</div>
       <div class="pill-btn" id="date-yesterday" onclick="setDateOption('yesterday')">昨天</div>
-      <div class="pill-btn" id="date-custom" onclick="setDateOption('custom')">其他日期</div>
+      <div class="pill-btn" id="date-custom" onclick="setDateOption('custom')">自選日期</div>
     </div>
     <div id="customDateContainer" style="display: none; margin-bottom: 12px;">
       <input type="date" id="customDateInput" onchange="applyCustomDate()">
     </div>
 
-    <!-- 快速點選分類按鈕 -->
-    <div style="font-size: 13px; color: var(--subtext);">選擇消費類別：</div>
+    <div style="font-size: 13px; color: var(--subtext);">點擊選擇消費類別：</div>
     <div class="chip-grid" id="categoryChips"></div>
 
-    <!-- 金額與備註 -->
     <div style="display: flex; gap: 8px; margin-bottom: 10px;">
       <input type="number" id="expenseAmount" placeholder="金額 (NT$)" inputmode="numeric" style="flex: 1.2;">
-      <input type="text" id="expenseDesc" placeholder="備註 (例如: 麥當勞)" style="flex: 1.8;">
+      <input type="text" id="expenseDesc" placeholder="備註 (例如: 晚餐)" style="flex: 1.8;">
     </div>
     <button class="btn-main" onclick="addExpense()">確認記入</button>
   </div>
 
-  <!-- 分類額度即時監控 -->
+  <!-- 分類額度監控 -->
   <div class="card">
     <h3 style="margin:0 0 12px 0;">各類別剩餘額度</h3>
     <div id="categoryProgressList"></div>
 
-    <!-- 快速新增分類 -->
     <div style="margin-top: 16px; padding-top: 12px; border-top: 1px dashed var(--border);">
       <div style="font-size: 13px; color: var(--subtext); margin-bottom: 6px;">＋ 新增類別與預算</div>
       <div style="display: flex; gap: 6px;">
-        <input type="text" id="newCatName" placeholder="名稱 (如: 交通)">
+        <input type="text" id="newCatName" placeholder="名稱 (如: 娛樂)">
         <input type="number" id="newCatLimit" placeholder="預算上限">
         <button onclick="addNewCategory()" style="border:none; background:#0f172a; color:#fff; border-radius: 8px; padding: 0 14px; font-size: 13px;">新增</button>
       </div>
     </div>
   </div>
 
-  <!-- 明細與報表 -->
+  <!-- 明細與美化報表操作 -->
   <div class="card">
     <div class="row" style="margin-bottom: 10px;">
       <h3 style="margin:0;">本月開銷明細</h3>
-      <button onclick="exportFullReport()" style="background: var(--success); color:#fff; border:none; border-radius: 8px; padding: 6px 12px; font-size: 13px; font-weight: 600;">📊 匯出完整報表</button>
     </div>
+    
+    <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+      <button onclick="previewPrintReport()" style="flex: 1.2; background: #0f172a; color:#fff; border:none; border-radius: 8px; padding: 10px 0; font-size: 13px; font-weight: 600;">🖨️ 美化報表 (PDF)</button>
+      <button onclick="exportCSV()" style="flex: 0.8; background: var(--success); color:#fff; border:none; border-radius: 8px; padding: 10px 0; font-size: 13px; font-weight: 600;">📥 CSV</button>
+    </div>
+
     <div id="recentExpenseList"></div>
   </div>
 
+  <!-- 隱藏的列印用美化報表區塊 -->
+  <div id="printReportArea" style="display: none;"></div>
+
   <script>
+    // 調色盤（現代簡約莫蘭迪色）
+    const PALETTE = ['#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4', '#f97316', '#64748b'];
+
     const todayObj = new Date();
     let selectedMonth = `${todayObj.getFullYear()}-${String(todayObj.getMonth() + 1).padStart(2, '0')}`;
     let selectedDate = formatDate(todayObj);
@@ -153,7 +180,6 @@
 
     function getKey(name) { return `${selectedMonth}_${name}`; }
 
-    // 日期快捷按鈕切換
     function setDateOption(type) {
       document.querySelectorAll('.pill-btn').forEach(btn => btn.classList.remove('active'));
       const customContainer = document.getElementById('customDateContainer');
@@ -181,7 +207,76 @@
       selectedDate = document.getElementById('customDateInput').value;
     }
 
-    // 核心數據讀取與畫面渲染
+    // 圓餅圖 Canvas 繪製
+    function drawPieChart(catStats, totalSpent) {
+      const canvas = document.getElementById('pieChartCanvas');
+      const ctx = canvas.getContext('2d');
+      const legend = document.getElementById('chartLegendList');
+      legend.innerHTML = '';
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      if (totalSpent === 0 || catStats.length === 0) {
+        ctx.beginPath();
+        ctx.arc(110, 110, 80, 0, 2 * Math.PI);
+        ctx.fillStyle = '#f1f5f9';
+        ctx.fill();
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '14px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('尚無開銷資料', 110, 110);
+        return;
+      }
+
+      let startAngle = -0.5 * Math.PI;
+      catStats.forEach((cat, index) => {
+        const sliceAngle = (cat.spent / totalSpent) * 2 * Math.PI;
+        const color = PALETTE[index % PALETTE.length];
+
+        // 甜甜圈扇形
+        ctx.beginPath();
+        ctx.arc(110, 110, 90, startAngle, startAngle + sliceAngle);
+        ctx.lineTo(110, 110);
+        ctx.fillStyle = color;
+        ctx.fill();
+
+        startAngle += sliceAngle;
+
+        // 圖例與佔比清單
+        const pct = ((cat.spent / totalSpent) * 100).toFixed(1);
+        const item = document.createElement('div');
+        item.className = 'legend-item';
+        item.innerHTML = `
+          <div style="display:flex; align-items:center;">
+            <span class="legend-color-dot" style="background:${color};"></span>
+            <span>${cat.name}</span>
+          </div>
+          <div style="font-weight:600;">
+            NT$ ${cat.spent.toLocaleString()} 
+            <span style="color:var(--subtext); font-weight:normal; margin-left:4px;">(${pct}%)</span>
+          </div>
+        `;
+        legend.appendChild(item);
+      });
+
+      // 甜甜圈中央簍空與累計
+      ctx.beginPath();
+      ctx.arc(110, 110, 52, 0, 2 * Math.PI);
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+
+      ctx.fillStyle = '#0f172a';
+      ctx.font = 'bold 15px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(`NT$ ${totalSpent}`, 110, 105);
+
+      ctx.fillStyle = '#64748b';
+      ctx.font = '11px sans-serif';
+      ctx.fillText('總花費', 110, 122);
+    }
+
+    // 儀表板載入
     function loadDashboard() {
       const budget = localStorage.getItem(getKey('budget')) || 0;
       const categories = JSON.parse(localStorage.getItem(getKey('categories')) || '[]');
@@ -189,7 +284,6 @@
 
       document.getElementById('totalBudgetInput').value = budget > 0 ? budget : '';
 
-      // 計算各分類花費與總花費
       const catSpent = {};
       let totalSpent = 0;
       expenses.forEach(e => {
@@ -197,7 +291,7 @@
         totalSpent += Number(e.amount);
       });
 
-      // 總進度條與餘額更新
+      // 總進度更新
       const remaining = Number(budget) - totalSpent;
       document.getElementById('totalSummary').innerText = `NT$ ${totalSpent.toLocaleString()} / NT$ ${Number(budget).toLocaleString()}`;
       const remEl = document.getElementById('totalRemaining');
@@ -209,7 +303,17 @@
       totalBar.style.width = `${ratio}%`;
       totalBar.style.background = totalSpent > budget ? 'var(--danger)' : 'var(--primary)';
 
-      // 渲染分類按鈕
+      // 整理佔比數據並繪製圓餅圖
+      const catStats = [];
+      categories.forEach((cat, idx) => {
+        if (catSpent[idx] && catSpent[idx] > 0) {
+          catStats.push({ name: cat.name, spent: catSpent[idx] });
+        }
+      });
+      catStats.sort((a, b) => b.spent - a.spent);
+      drawPieChart(catStats, totalSpent);
+
+      // 渲染標籤按鈕
       const chips = document.getElementById('categoryChips');
       chips.innerHTML = '';
       if (categories.length === 0) {
@@ -228,7 +332,7 @@
         });
       }
 
-      // 渲染各分類即時額度進度
+      // 渲染細項進度
       const progList = document.getElementById('categoryProgressList');
       progList.innerHTML = '';
       categories.forEach((cat, idx) => {
@@ -255,15 +359,15 @@
         progList.appendChild(item);
       });
 
-      // 渲染明細清單（最新至最舊）
+      // 渲染明細清單
       const listEl = document.getElementById('recentExpenseList');
       listEl.innerHTML = '';
       if (expenses.length === 0) {
-        listEl.innerHTML = '<div style="color:var(--subtext); font-size:13px; text-align:center; padding: 12px 0;">當月尚無任何花費記錄</div>';
+        listEl.innerHTML = '<div style="color:var(--subtext); font-size:13px; text-align:center; padding: 12px 0;">當月尚無開銷紀錄</div>';
       } else {
         expenses.slice().reverse().forEach((e, revIdx) => {
           const actualIdx = expenses.length - 1 - revIdx;
-          const catName = categories[e.catIdx] ? categories[e.catIdx].name : '未知類別';
+          const catName = categories[e.catIdx] ? categories[e.catIdx].name : '未知';
           const row = document.createElement('div');
           row.className = 'expense-list-item';
           row.innerHTML = `
@@ -271,16 +375,14 @@
               <div style="font-weight:600; font-size:14px;">${catName} - NT$ ${Number(e.amount).toLocaleString()}</div>
               <div style="font-size:12px; color:var(--subtext);">${e.date} ｜ ${e.desc}</div>
             </div>
-            <div>
-              <button class="del-btn" onclick="deleteExpense(${actualIdx})">刪除</button>
-            </div>
+            <button class="del-btn" onclick="deleteExpense(${actualIdx})">刪除</button>
           `;
           listEl.appendChild(row);
         });
       }
     }
 
-    // 業務動作
+    // 動作函式
     function switchMonth() {
       selectedMonth = document.getElementById('currentMonth').value;
       selectedCategoryIdx = null;
@@ -289,7 +391,7 @@
 
     function saveTotalBudget() {
       const budget = document.getElementById('totalBudgetInput').value;
-      if (!budget || budget <= 0) return alert('請輸入有效預算金額');
+      if (!budget || budget <= 0) return alert('請輸入有效預算');
       localStorage.setItem(getKey('budget'), budget);
       loadDashboard();
     }
@@ -297,7 +399,7 @@
     function addNewCategory() {
       const name = document.getElementById('newCatName').value.trim();
       const limit = document.getElementById('newCatLimit').value;
-      if (!name || !limit) return alert('請填寫類別名稱與預算');
+      if (!name || !limit) return alert('請填寫完整資訊');
 
       const cats = JSON.parse(localStorage.getItem(getKey('categories')) || '[]');
       cats.push({ name, limit });
@@ -310,7 +412,7 @@
     }
 
     function addExpense() {
-      if (selectedCategoryIdx === null) return alert('請點擊選擇消費分類');
+      if (selectedCategoryIdx === null) return alert('請先點選消費類別按鈕');
       const amount = document.getElementById('expenseAmount').value;
       const desc = document.getElementById('expenseDesc').value.trim();
       if (!amount || Number(amount) <= 0) return alert('請輸入有效金額');
@@ -337,19 +439,122 @@
       loadDashboard();
     }
 
-    // 輸出報表
-    function exportFullReport() {
+    // 美化列印/PDF報表
+    function previewPrintReport() {
+      const categories = JSON.parse(localStorage.getItem(getKey('categories')) || '[]');
+      const expenses = JSON.parse(localStorage.getItem(getKey('expenses')) || '[]');
+      const budget = Number(localStorage.getItem(getKey('budget')) || 0);
+
+      if (expenses.length === 0) return alert('本月尚無任何紀錄');
+
+      let totalSpent = 0;
+      const catSpent = {};
+      expenses.forEach(e => {
+        totalSpent += Number(e.amount);
+        catSpent[e.catIdx] = (catSpent[e.catIdx] || 0) + Number(e.amount);
+      });
+      const remaining = budget - totalSpent;
+
+      const printArea = document.getElementById('printReportArea');
+      printArea.style.display = 'block';
+
+      let catRows = '';
+      categories.forEach((cat, idx) => {
+        const spent = catSpent[idx] || 0;
+        const pct = totalSpent > 0 ? ((spent / totalSpent) * 100).toFixed(1) : 0;
+        catRows += `
+          <tr style="border-bottom: 1px solid #e2e8f0;">
+            <td style="padding: 8px 12px;">${cat.name}</td>
+            <td style="padding: 8px 12px; text-align:right;">NT$ ${Number(cat.limit).toLocaleString()}</td>
+            <td style="padding: 8px 12px; text-align:right;">NT$ ${spent.toLocaleString()}</td>
+            <td style="padding: 8px 12px; text-align:right; font-weight:600;">${pct}%</td>
+          </tr>
+        `;
+      });
+
+      let expRows = '';
+      expenses.forEach(e => {
+        const catName = categories[e.catIdx] ? categories[e.catIdx].name : '未知';
+        expRows += `
+          <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 8px 12px;">${e.date}</td>
+            <td style="padding: 8px 12px;">${catName}</td>
+            <td style="padding: 8px 12px;">${e.desc}</td>
+            <td style="padding: 8px 12px; text-align:right; font-weight:600;">NT$ ${Number(e.amount).toLocaleString()}</td>
+          </tr>
+        `;
+      });
+
+      printArea.innerHTML = `
+        <div style="max-width: 800px; margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
+          <div style="border-bottom: 2px solid #0f172a; padding-bottom: 12px; margin-bottom: 20px;">
+            <h1 style="margin: 0; font-size: 24px; color:#0f172a;">【${selectedMonth}】個人財務開銷月度總結</h1>
+            <div style="color: #64748b; font-size: 13px; margin-top: 4px;">報表生成日期：${new Date().toLocaleDateString('zh-TW')}</div>
+          </div>
+
+          <!-- 關鍵指標卡片 -->
+          <div style="display: flex; gap: 12px; margin-bottom: 24px;">
+            <div style="flex:1; background: #f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:12px;">
+              <div style="font-size:12px; color:#64748b;">總設定預算</div>
+              <div style="font-size:20px; font-weight:700; color:#0f172a; margin-top:4px;">NT$ ${budget.toLocaleString()}</div>
+            </div>
+            <div style="flex:1; background: #f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:12px;">
+              <div style="font-size:12px; color:#64748b;">本月總累積支出</div>
+              <div style="font-size:20px; font-weight:700; color:#2563eb; margin-top:4px;">NT$ ${totalSpent.toLocaleString()}</div>
+            </div>
+            <div style="flex:1; background: #f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:12px;">
+              <div style="font-size:12px; color:#64748b;">剩餘淨額</div>
+              <div style="font-size:20px; font-weight:700; color:${remaining >= 0 ? '#10b981' : '#ef4444'}; margin-top:4px;">NT$ ${remaining.toLocaleString()}</div>
+            </div>
+          </div>
+
+          <!-- 各類別預算達成與佔比 -->
+          <h3 style="margin: 0 0 10px 0; font-size: 16px;">各細項花費與佔比摘要</h3>
+          <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 24px;">
+            <thead>
+              <tr style="background: #f1f5f9; text-align: left;">
+                <th style="padding: 8px 12px;">分類名稱</th>
+                <th style="padding: 8px 12px; text-align:right;">預算上限</th>
+                <th style="padding: 8px 12px; text-align:right;">實際支出</th>
+                <th style="padding: 8px 12px; text-align:right;">佔總額百分比</th>
+              </tr>
+            </thead>
+            <tbody>${catRows}</tbody>
+          </table>
+
+          <!-- 完整流水帳明細 -->
+          <h3 style="margin: 0 0 10px 0; font-size: 16px;">開銷消費明細清單</h3>
+          <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+            <thead>
+              <tr style="background: #f1f5f9; text-align: left;">
+                <th style="padding: 8px 12px;">日期</th>
+                <th style="padding: 8px 12px;">類別</th>
+                <th style="padding: 8px 12px;">備註說明</th>
+                <th style="padding: 8px 12px; text-align:right;">金額</th>
+              </tr>
+            </thead>
+            <tbody>${expRows}</tbody>
+          </table>
+        </div>
+      `;
+
+      setTimeout(() => {
+        window.print();
+        printArea.style.display = 'none';
+      }, 200);
+    }
+
+    // CSV 備用匯出
+    function exportCSV() {
       const categories = JSON.parse(localStorage.getItem(getKey('categories')) || '[]');
       const expenses = JSON.parse(localStorage.getItem(getKey('expenses')) || '[]');
       const budget = localStorage.getItem(getKey('budget')) || 0;
 
-      if (expenses.length === 0) return alert('本月尚無任何紀錄可匯出');
+      if (expenses.length === 0) return alert('本月尚無任何紀錄');
 
-      let csv = '\uFEFF'; // UTF-8 BOM 防止亂碼
+      let csv = '\uFEFF';
       csv += `【${selectedMonth} 預算開銷報表】\n`;
       csv += `總預算,NT$ ${budget}\n\n`;
-
-      csv += `--- 消費明細清單 ---\n`;
       csv += `日期,分類,備註,金額\n`;
       let total = 0;
       expenses.forEach(e => {
@@ -357,15 +562,14 @@
         csv += `"${e.date}","${catName}","${e.desc}",${e.amount}\n`;
         total += Number(e.amount);
       });
-
       csv += `\n總累計支出,,NT$ ${total}\n`;
-      csv += `本月淨剩餘,,NT$ ${budget - total}\n`;
+      csv += `剩餘可用,,NT$ ${budget - total}\n`;
 
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${selectedMonth}_開支財務報表.csv`;
+      a.download = `${selectedMonth}_財務報表.csv`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
