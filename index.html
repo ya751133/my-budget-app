@@ -7,6 +7,12 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="預算記帳">
+
+  <!-- 引入免後端直接生成 PDF & Excel (含圖表與樣式) 的開源函式庫 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/exceljs@4.3.0/dist/exceljs.min.js"></script>
+
   <style>
     :root {
       --primary: #2563eb;
@@ -20,7 +26,7 @@
       --subtext: #64748b;
       --border: #e2e8f0;
     }
-    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", "Microsoft JhengHei", sans-serif; -webkit-tap-highlight-color: transparent; }
     body { margin: 0; padding: 16px; background-color: var(--bg); color: var(--text); padding-bottom: 90px; }
     
     .card { background: var(--card); border-radius: 18px; padding: 18px; margin-bottom: 14px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.04); }
@@ -44,7 +50,7 @@
     .chip-btn { padding: 8px 14px; border: 1.5px solid var(--border); border-radius: 20px; font-size: 14px; background: #fff; color: var(--text); cursor: pointer; }
     .chip-btn.active { border-color: var(--primary); background: var(--primary); color: #fff; font-weight: 600; }
     
-    /* 圓餅圖與圖例容器 */
+    /* 圓餅圖與圖例 */
     .chart-container { display: flex; flex-direction: column; align-items: center; margin: 12px 0; }
     .chart-legend { width: 100%; margin-top: 14px; }
     .legend-item { display: flex; justify-content: space-between; align-items: center; font-size: 13px; margin-bottom: 6px; padding: 4px 0; border-bottom: 1px dashed #f1f5f9; }
@@ -58,12 +64,7 @@
     .amount-positive { color: var(--success); font-weight: 700; }
     .amount-negative { color: var(--danger); font-weight: 700; }
 
-    /* 美化列印報表樣式（螢幕不可見，按列印時呈現） */
-    @media print {
-      body * { visibility: hidden; }
-      #printReportArea, #printReportArea * { visibility: visible; }
-      #printReportArea { position: absolute; left: 0; top: 0; width: 100%; padding: 24px; background: #fff; }
-    }
+    .export-btn { border: none; border-radius: 10px; padding: 12px 0; font-size: 14px; font-weight: 600; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
   </style>
 </head>
 <body>
@@ -100,12 +101,12 @@
   <div class="card">
     <h3 style="margin:0 0 8px 0;">📊 開銷佔比分析</h3>
     <div class="chart-container">
-      <canvas id="pieChartCanvas" width="220" height="220"></canvas>
+      <canvas id="pieChartCanvas" width="260" height="260"></canvas>
       <div class="chart-legend" id="chartLegendList"></div>
     </div>
   </div>
 
-  <!-- 新增消費 -->
+  <!-- 記一筆開支 -->
   <div class="card">
     <h3 style="margin:0 0 12px 0;">記一筆開支</h3>
 
@@ -128,7 +129,7 @@
     <button class="btn-main" onclick="addExpense()">確認記入</button>
   </div>
 
-  <!-- 分類額度監控 -->
+  <!-- 各細項額度與新增類別 -->
   <div class="card">
     <h3 style="margin:0 0 12px 0;">各類別剩餘額度</h3>
     <div id="categoryProgressList"></div>
@@ -137,32 +138,30 @@
       <div style="font-size: 13px; color: var(--subtext); margin-bottom: 6px;">＋ 新增類別與預算</div>
       <div style="display: flex; gap: 6px;">
         <input type="text" id="newCatName" placeholder="名稱 (如: 娛樂)">
-        <input type="number" id="newCatLimit" placeholder="預算上限">
+        <input type="number" id="newCatLimit" placeholder="上限 (NT$)">
         <button onclick="addNewCategory()" style="border:none; background:#0f172a; color:#fff; border-radius: 8px; padding: 0 14px; font-size: 13px;">新增</button>
       </div>
     </div>
   </div>
 
-  <!-- 明細與美化報表操作 -->
+  <!-- 明細與匯出區 -->
   <div class="card">
-    <div class="row" style="margin-bottom: 10px;">
-      <h3 style="margin:0;">本月開銷明細</h3>
-    </div>
+    <h3 style="margin:0 0 12px 0;">本月開銷明細與匯出</h3>
     
-    <div style="display: flex; gap: 8px; margin-bottom: 12px;">
-      <button onclick="previewPrintReport()" style="flex: 1.2; background: #0f172a; color:#fff; border:none; border-radius: 8px; padding: 10px 0; font-size: 13px; font-weight: 600;">🖨️ 美化報表 (PDF)</button>
-      <button onclick="exportCSV()" style="flex: 0.8; background: var(--success); color:#fff; border:none; border-radius: 8px; padding: 10px 0; font-size: 13px; font-weight: 600;">📥 CSV</button>
+    <div style="display: flex; gap: 10px; margin-bottom: 16px;">
+      <button class="export-btn" onclick="exportDirectPDF()" style="flex: 1; background: #e11d48;">
+        <span>📄 匯出精美 PDF</span>
+      </button>
+      <button class="export-btn" onclick="exportStyledExcel()" style="flex: 1; background: #059669;">
+        <span>📊 匯出美化 Excel</span>
+      </button>
     </div>
 
     <div id="recentExpenseList"></div>
   </div>
 
-  <!-- 隱藏的列印用美化報表區塊 -->
-  <div id="printReportArea" style="display: none;"></div>
-
   <script>
-    // 調色盤（現代簡約莫蘭迪色）
-    const PALETTE = ['#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4', '#f97316', '#64748b'];
+    const PALETTE = ['#2563eb', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4', '#f97316', '#64748b'];
 
     const todayObj = new Date();
     let selectedMonth = `${todayObj.getFullYear()}-${String(todayObj.getMonth() + 1).padStart(2, '0')}`;
@@ -207,7 +206,7 @@
       selectedDate = document.getElementById('customDateInput').value;
     }
 
-    // 圓餅圖 Canvas 繪製
+    // 繪製圓餅圖
     function drawPieChart(catStats, totalSpent) {
       const canvas = document.getElementById('pieChartCanvas');
       const ctx = canvas.getContext('2d');
@@ -215,16 +214,19 @@
       legend.innerHTML = '';
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+      const cx = canvas.width / 2;
+      const cy = canvas.height / 2;
+
       if (totalSpent === 0 || catStats.length === 0) {
         ctx.beginPath();
-        ctx.arc(110, 110, 80, 0, 2 * Math.PI);
+        ctx.arc(cx, cy, 95, 0, 2 * Math.PI);
         ctx.fillStyle = '#f1f5f9';
         ctx.fill();
         ctx.fillStyle = '#94a3b8';
         ctx.font = '14px sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText('尚無開銷資料', 110, 110);
+        ctx.fillText('本月尚無開銷資料', cx, cy);
         return;
       }
 
@@ -233,16 +235,14 @@
         const sliceAngle = (cat.spent / totalSpent) * 2 * Math.PI;
         const color = PALETTE[index % PALETTE.length];
 
-        // 甜甜圈扇形
         ctx.beginPath();
-        ctx.arc(110, 110, 90, startAngle, startAngle + sliceAngle);
-        ctx.lineTo(110, 110);
+        ctx.arc(cx, cy, 105, startAngle, startAngle + sliceAngle);
+        ctx.lineTo(cx, cy);
         ctx.fillStyle = color;
         ctx.fill();
 
         startAngle += sliceAngle;
 
-        // 圖例與佔比清單
         const pct = ((cat.spent / totalSpent) * 100).toFixed(1);
         const item = document.createElement('div');
         item.className = 'legend-item';
@@ -259,21 +259,21 @@
         legend.appendChild(item);
       });
 
-      // 甜甜圈中央簍空與累計
+      // 甜甜圈內圈
       ctx.beginPath();
-      ctx.arc(110, 110, 52, 0, 2 * Math.PI);
+      ctx.arc(cx, cy, 60, 0, 2 * Math.PI);
       ctx.fillStyle = '#ffffff';
       ctx.fill();
 
       ctx.fillStyle = '#0f172a';
-      ctx.font = 'bold 15px sans-serif';
+      ctx.font = 'bold 16px sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(`NT$ ${totalSpent}`, 110, 105);
+      ctx.fillText(`NT$ ${totalSpent.toLocaleString()}`, cx, cy - 8);
 
       ctx.fillStyle = '#64748b';
-      ctx.font = '11px sans-serif';
-      ctx.fillText('總花費', 110, 122);
+      ctx.font = '12px sans-serif';
+      ctx.fillText('總花費', cx, cy + 12);
     }
 
     // 儀表板載入
@@ -291,7 +291,6 @@
         totalSpent += Number(e.amount);
       });
 
-      // 總進度更新
       const remaining = Number(budget) - totalSpent;
       document.getElementById('totalSummary').innerText = `NT$ ${totalSpent.toLocaleString()} / NT$ ${Number(budget).toLocaleString()}`;
       const remEl = document.getElementById('totalRemaining');
@@ -303,7 +302,7 @@
       totalBar.style.width = `${ratio}%`;
       totalBar.style.background = totalSpent > budget ? 'var(--danger)' : 'var(--primary)';
 
-      // 整理佔比數據並繪製圓餅圖
+      // 圓餅圖
       const catStats = [];
       categories.forEach((cat, idx) => {
         if (catSpent[idx] && catSpent[idx] > 0) {
@@ -313,7 +312,7 @@
       catStats.sort((a, b) => b.spent - a.spent);
       drawPieChart(catStats, totalSpent);
 
-      // 渲染標籤按鈕
+      // 分類按鈕
       const chips = document.getElementById('categoryChips');
       chips.innerHTML = '';
       if (categories.length === 0) {
@@ -332,7 +331,7 @@
         });
       }
 
-      // 渲染細項進度
+      // 各分類額度
       const progList = document.getElementById('categoryProgressList');
       progList.innerHTML = '';
       categories.forEach((cat, idx) => {
@@ -359,7 +358,7 @@
         progList.appendChild(item);
       });
 
-      // 渲染明細清單
+      // 明細清單
       const listEl = document.getElementById('recentExpenseList');
       listEl.innerHTML = '';
       if (expenses.length === 0) {
@@ -382,7 +381,6 @@
       }
     }
 
-    // 動作函式
     function switchMonth() {
       selectedMonth = document.getElementById('currentMonth').value;
       selectedCategoryIdx = null;
@@ -439,13 +437,15 @@
       loadDashboard();
     }
 
-    // 美化列印/PDF報表
-    function previewPrintReport() {
+    // ==========================================
+    // 1. 直接輸出精美 PDF（免列印、內含圓餅圖）
+    // ==========================================
+    function exportDirectPDF() {
       const categories = JSON.parse(localStorage.getItem(getKey('categories')) || '[]');
       const expenses = JSON.parse(localStorage.getItem(getKey('expenses')) || '[]');
       const budget = Number(localStorage.getItem(getKey('budget')) || 0);
 
-      if (expenses.length === 0) return alert('本月尚無任何紀錄');
+      if (expenses.length === 0) return alert('本月尚無任何紀錄可匯出');
 
       let totalSpent = 0;
       const catSpent = {};
@@ -455,124 +455,295 @@
       });
       const remaining = budget - totalSpent;
 
-      const printArea = document.getElementById('printReportArea');
-      printArea.style.display = 'block';
+      // 取得畫面上的圓餅圖高解析影像 Base64
+      const chartImg = document.getElementById('pieChartCanvas').toDataURL('image/png');
 
-      let catRows = '';
-      categories.forEach((cat, idx) => {
-        const spent = catSpent[idx] || 0;
-        const pct = totalSpent > 0 ? ((spent / totalSpent) * 100).toFixed(1) : 0;
-        catRows += `
-          <tr style="border-bottom: 1px solid #e2e8f0;">
-            <td style="padding: 8px 12px;">${cat.name}</td>
-            <td style="padding: 8px 12px; text-align:right;">NT$ ${Number(cat.limit).toLocaleString()}</td>
-            <td style="padding: 8px 12px; text-align:right;">NT$ ${spent.toLocaleString()}</td>
-            <td style="padding: 8px 12px; text-align:right; font-weight:600;">${pct}%</td>
-          </tr>
-        `;
+      // 分類概況表資料
+      const catTableBody = [
+        [
+          { text: '分類名稱', bold: true, fillColor: '#1e293b', color: '#ffffff' },
+          { text: '上限 (NT$)', bold: true, fillColor: '#1e293b', color: '#ffffff', alignment: 'right' },
+          { text: '實付 (NT$)', bold: true, fillColor: '#1e293b', color: '#ffffff', alignment: 'right' },
+          { text: '剩餘 (NT$)', bold: true, fillColor: '#1e293b', color: '#ffffff', alignment: 'right' },
+          { text: '佔總額 %', bold: true, fillColor: '#1e293b', color: '#ffffff', alignment: 'right' }
+        ]
+      ];
+
+      categories.forEach(cat => {
+        const spent = catSpent[categories.indexOf(cat)] || 0;
+        const left = Number(cat.limit) - spent;
+        const pct = totalSpent > 0 ? ((spent / totalSpent) * 100).toFixed(1) + '%' : '0%';
+        const isOver = left < 0;
+
+        catTableBody.push([
+          { text: cat.name },
+          { text: Number(cat.limit).toLocaleString(), alignment: 'right' },
+          { text: spent.toLocaleString(), alignment: 'right' },
+          { text: left.toLocaleString(), alignment: 'right', color: isOver ? '#ef4444' : '#10b981', bold: isOver },
+          { text: pct, alignment: 'right' }
+        ]);
       });
 
-      let expRows = '';
+      // 消費清單資料
+      const expTableBody = [
+        [
+          { text: '日期', bold: true, fillColor: '#334155', color: '#ffffff' },
+          { text: '類別', bold: true, fillColor: '#334155', color: '#ffffff' },
+          { text: '備註說明', bold: true, fillColor: '#334155', color: '#ffffff' },
+          { text: '金額 (NT$)', bold: true, fillColor: '#334155', color: '#ffffff', alignment: 'right' }
+        ]
+      ];
+
       expenses.forEach(e => {
         const catName = categories[e.catIdx] ? categories[e.catIdx].name : '未知';
-        expRows += `
-          <tr style="border-bottom: 1px solid #f1f5f9;">
-            <td style="padding: 8px 12px;">${e.date}</td>
-            <td style="padding: 8px 12px;">${catName}</td>
-            <td style="padding: 8px 12px;">${e.desc}</td>
-            <td style="padding: 8px 12px; text-align:right; font-weight:600;">NT$ ${Number(e.amount).toLocaleString()}</td>
-          </tr>
-        `;
+        expTableBody.push([
+          { text: e.date },
+          { text: catName },
+          { text: e.desc },
+          { text: Number(e.amount).toLocaleString(), alignment: 'right', bold: true }
+        ]);
       });
 
-      printArea.innerHTML = `
-        <div style="max-width: 800px; margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
-          <div style="border-bottom: 2px solid #0f172a; padding-bottom: 12px; margin-bottom: 20px;">
-            <h1 style="margin: 0; font-size: 24px; color:#0f172a;">【${selectedMonth}】個人財務開銷月度總結</h1>
-            <div style="color: #64748b; font-size: 13px; margin-top: 4px;">報表生成日期：${new Date().toLocaleDateString('zh-TW')}</div>
-          </div>
+      const docDefinition = {
+        content: [
+          { text: `【${selectedMonth}】個人財務月度分析報表`, fontSize: 18, bold: true, color: '#0f172a', margin: [0, 0, 0, 4] },
+          { text: `報表產出時間：${new Date().toLocaleString('zh-TW')}`, fontSize: 9, color: '#64748b', margin: [0, 0, 0, 16] },
 
-          <!-- 關鍵指標卡片 -->
-          <div style="display: flex; gap: 12px; margin-bottom: 24px;">
-            <div style="flex:1; background: #f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:12px;">
-              <div style="font-size:12px; color:#64748b;">總設定預算</div>
-              <div style="font-size:20px; font-weight:700; color:#0f172a; margin-top:4px;">NT$ ${budget.toLocaleString()}</div>
-            </div>
-            <div style="flex:1; background: #f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:12px;">
-              <div style="font-size:12px; color:#64748b;">本月總累積支出</div>
-              <div style="font-size:20px; font-weight:700; color:#2563eb; margin-top:4px;">NT$ ${totalSpent.toLocaleString()}</div>
-            </div>
-            <div style="flex:1; background: #f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:12px;">
-              <div style="font-size:12px; color:#64748b;">剩餘淨額</div>
-              <div style="font-size:20px; font-weight:700; color:${remaining >= 0 ? '#10b981' : '#ef4444'}; margin-top:4px;">NT$ ${remaining.toLocaleString()}</div>
-            </div>
-          </div>
+          // 指標摘要方塊
+          {
+            table: {
+              widths: ['*', '*', '*'],
+              body: [[
+                { text: `總預算上限\nNT$ ${budget.toLocaleString()}`, alignment: 'center', fillColor: '#f1f5f9', margin: [0, 6, 0, 6], bold: true },
+                { text: `總累計支出\nNT$ ${totalSpent.toLocaleString()}`, alignment: 'center', fillColor: '#eff6ff', color: '#2563eb', margin: [0, 6, 0, 6], bold: true },
+                { text: `剩餘額度\nNT$ ${remaining.toLocaleString()}`, alignment: 'center', fillColor: remaining < 0 ? '#fee2e2' : '#ecfdf5', color: remaining < 0 ? '#ef4444' : '#059669', margin: [0, 6, 0, 6], bold: true }
+              ]]
+            },
+            layout: 'noBorders',
+            margin: [0, 0, 0, 16]
+          },
 
-          <!-- 各類別預算達成與佔比 -->
-          <h3 style="margin: 0 0 10px 0; font-size: 16px;">各細項花費與佔比摘要</h3>
-          <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 24px;">
-            <thead>
-              <tr style="background: #f1f5f9; text-align: left;">
-                <th style="padding: 8px 12px;">分類名稱</th>
-                <th style="padding: 8px 12px; text-align:right;">預算上限</th>
-                <th style="padding: 8px 12px; text-align:right;">實際支出</th>
-                <th style="padding: 8px 12px; text-align:right;">佔總額百分比</th>
-              </tr>
-            </thead>
-            <tbody>${catRows}</tbody>
-          </table>
+          // 圓餅圖與各項佔比表格
+          { text: '各分類開銷分析與圓餅圖', fontSize: 13, bold: true, margin: [0, 0, 0, 8] },
+          {
+            columns: [
+              { image: chartImg, width: 140, alignment: 'center' },
+              {
+                width: '*',
+                table: {
+                  headerRows: 1,
+                  widths: ['*', 'auto', 'auto', 'auto', 'auto'],
+                  body: catTableBody
+                },
+                layout: 'lightHorizontalLines',
+                fontSize: 9
+              }
+            ],
+            margin: [0, 0, 0, 20]
+          },
 
-          <!-- 完整流水帳明細 -->
-          <h3 style="margin: 0 0 10px 0; font-size: 16px;">開銷消費明細清單</h3>
-          <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
-            <thead>
-              <tr style="background: #f1f5f9; text-align: left;">
-                <th style="padding: 8px 12px;">日期</th>
-                <th style="padding: 8px 12px;">類別</th>
-                <th style="padding: 8px 12px;">備註說明</th>
-                <th style="padding: 8px 12px; text-align:right;">金額</th>
-              </tr>
-            </thead>
-            <tbody>${expRows}</tbody>
-          </table>
-        </div>
-      `;
+          // 明細表
+          { text: '完整開銷消費流水帳', fontSize: 13, bold: true, margin: [0, 0, 0, 8] },
+          {
+            table: {
+              headerRows: 1,
+              widths: ['20%', '20%', '*', '25%'],
+              body: expTableBody
+            },
+            layout: 'lightHorizontalLines',
+            fontSize: 9
+          }
+        ],
+        defaultStyle: {
+          font: 'Roboto'
+        }
+      };
 
-      setTimeout(() => {
-        window.print();
-        printArea.style.display = 'none';
-      }, 200);
+      pdfMake.createPdf(docDefinition).download(`${selectedMonth}_財務報表.pdf`);
     }
 
-    // CSV 備用匯出
-    function exportCSV() {
+    // ==========================================
+    // 2. 輸出美化 Excel（含內嵌圓餅圖、超支亮紅）
+    // ==========================================
+    async function exportStyledExcel() {
       const categories = JSON.parse(localStorage.getItem(getKey('categories')) || '[]');
       const expenses = JSON.parse(localStorage.getItem(getKey('expenses')) || '[]');
-      const budget = localStorage.getItem(getKey('budget')) || 0;
+      const budget = Number(localStorage.getItem(getKey('budget')) || 0);
 
-      if (expenses.length === 0) return alert('本月尚無任何紀錄');
+      if (expenses.length === 0) return alert('本月尚無任何紀錄可匯出');
 
-      let csv = '\uFEFF';
-      csv += `【${selectedMonth} 預算開銷報表】\n`;
-      csv += `總預算,NT$ ${budget}\n\n`;
-      csv += `日期,分類,備註,金額\n`;
-      let total = 0;
+      let totalSpent = 0;
+      const catSpent = {};
+      expenses.forEach(e => {
+        totalSpent += Number(e.amount);
+        catSpent[e.catIdx] = (catSpent[e.catIdx] || 0) + Number(e.amount);
+      });
+      const remaining = budget - totalSpent;
+
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = '智慧預算記帳';
+
+      // ------------------------------------
+      // 工作表 1：月度總覽與分析 (包含圓餅圖)
+      // ------------------------------------
+      const wsSummary = workbook.addWorksheet('月度總覽與分析', {
+        views: [{ showGridLines: true }]
+      });
+
+      // 標題列
+      wsSummary.mergeCells('A1:E1');
+      const titleCell = wsSummary.getCell('A1');
+      titleCell.value = `【${selectedMonth}】個人財務開銷月度總結`;
+      titleCell.font = { name: 'PingFang TC', size: 16, bold: true, color: { argb: 'FFFFFFFF' } };
+      titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
+      titleCell.alignment = { vertical: 'middle', horizontal: 'center' };
+      wsSummary.getRow(1).height = 36;
+
+      // 關鍵數據卡片
+      wsSummary.getCell('A3').value = '總預算上限';
+      wsSummary.getCell('A4').value = budget;
+      wsSummary.getCell('B3').value = '本月總支出';
+      wsSummary.getCell('B4').value = totalSpent;
+      wsSummary.getCell('C3').value = '剩餘可用額度';
+      wsSummary.getCell('C4').value = remaining;
+
+      ['A3', 'B3', 'C3'].forEach(cell => {
+        wsSummary.getCell(cell).font = { name: 'PingFang TC', size: 10, color: { argb: 'FF64748B' } };
+        wsSummary.getCell(cell).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+      });
+
+      ['A4', 'B4', 'C4'].forEach(cell => {
+        wsSummary.getCell(cell).font = { name: 'PingFang TC', size: 14, bold: true };
+        wsSummary.getCell(cell).numFmt = '"NT$" #,##0';
+      });
+
+      // 總額超支變紅
+      if (remaining < 0) {
+        wsSummary.getCell('C4').font = { name: 'PingFang TC', size: 14, bold: true, color: { argb: 'FFEF4444' } };
+        wsSummary.getCell('C4').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEE2E2' } };
+      } else {
+        wsSummary.getCell('C4').font = { name: 'PingFang TC', size: 14, bold: true, color: { argb: 'FF059669' } };
+      }
+
+      // 分類預算摘要表頭
+      wsSummary.getCell('A6').value = '分類名稱';
+      wsSummary.getCell('B6').value = '預算上限';
+      wsSummary.getCell('C6').value = '實際花費';
+      wsSummary.getCell('D6').value = '剩餘額度';
+      wsSummary.getCell('E6').value = '佔比 (%)';
+
+      ['A6', 'B6', 'C6', 'D6', 'E6'].forEach(cell => {
+        const c = wsSummary.getCell(cell);
+        c.font = { name: 'PingFang TC', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
+        c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2563EB' } };
+        c.alignment = { vertical: 'middle', horizontal: cell === 'A6' ? 'left' : 'right' };
+      });
+      wsSummary.getRow(6).height = 24;
+
+      let rowIdx = 7;
+      categories.forEach(cat => {
+        const spent = catSpent[categories.indexOf(cat)] || 0;
+        const left = Number(cat.limit) - spent;
+        const pct = totalSpent > 0 ? (spent / totalSpent) : 0;
+        const isOver = left < 0;
+
+        wsSummary.getCell(`A${rowIdx}`).value = cat.name;
+        wsSummary.getCell(`B${rowIdx}`).value = Number(cat.limit);
+        wsSummary.getCell(`C${rowIdx}`).value = spent;
+        wsSummary.getCell(`D${rowIdx}`).value = left;
+        wsSummary.getCell(`E${rowIdx}`).value = pct;
+
+        ['B', 'C', 'D'].forEach(col => {
+          wsSummary.getCell(`${col}${rowIdx}`).numFmt = '#,##0';
+        });
+        wsSummary.getCell(`E${rowIdx}`).numFmt = '0.0%';
+
+        // 超支自動亮紅！
+        if (isOver) {
+          wsSummary.getCell(`D${rowIdx}`).font = { name: 'PingFang TC', color: { argb: 'FFB91C1C' }, bold: true };
+          wsSummary.getCell(`D${rowIdx}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEE2E2' } };
+        } else {
+          wsSummary.getCell(`D${rowIdx}`).font = { name: 'PingFang TC', color: { argb: 'FF047857' } };
+        }
+
+        // 斑馬底紋
+        if (rowIdx % 2 === 0) {
+          ['A', 'B', 'C', 'E'].forEach(col => {
+            wsSummary.getCell(`${col}${rowIdx}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+          });
+        }
+        rowIdx++;
+      });
+
+      // 將手機畫面上繪製好的高畫質圓餅圖嵌入到 Excel 工作表中
+      const chartBase64 = document.getElementById('pieChartCanvas').toDataURL('image/png');
+      const imageId = workbook.addImage({
+        base64: chartBase64,
+        extension: 'png',
+      });
+      wsSummary.addImage(imageId, {
+        tl: { col: 5.5, row: 2 },
+        ext: { width: 280, height: 280 }
+      });
+
+      wsSummary.columns = [
+        { width: 16 },
+        { width: 15 },
+        { width: 15 },
+        { width: 16 },
+        { width: 14 }
+      ];
+
+      // ------------------------------------
+      // 工作表 2：詳細消費清單 (明細)
+      // ------------------------------------
+      const wsDetail = workbook.addWorksheet('詳細消費清單', {
+        views: [{ showGridLines: true }]
+      });
+
+      wsDetail.mergeCells('A1:D1');
+      const detailTitle = wsDetail.getCell('A1');
+      detailTitle.value = `【${selectedMonth}】詳細消費開支明細記錄`;
+      detailTitle.font = { name: 'PingFang TC', size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
+      detailTitle.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F172A' } };
+      detailTitle.alignment = { vertical: 'middle', horizontal: 'center' };
+      wsDetail.getRow(1).height = 30;
+
+      wsDetail.getRow(3).values = ['日期', '消費類別', '備註說明', '金額 (NT$)'];
+      wsDetail.getRow(3).font = { name: 'PingFang TC', bold: true, color: { argb: 'FFFFFFFF' } };
+      wsDetail.getRow(3).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF334155' } };
+      wsDetail.getRow(3).height = 22;
+
+      let detailRow = 4;
       expenses.forEach(e => {
         const catName = categories[e.catIdx] ? categories[e.catIdx].name : '未知';
-        csv += `"${e.date}","${catName}","${e.desc}",${e.amount}\n`;
-        total += Number(e.amount);
-      });
-      csv += `\n總累計支出,,NT$ ${total}\n`;
-      csv += `剩餘可用,,NT$ ${budget - total}\n`;
+        const row = wsDetail.getRow(detailRow);
+        row.values = [e.date, catName, e.desc, Number(e.amount)];
+        row.getCell(4).numFmt = '#,##0';
+        row.font = { name: 'PingFang TC', size: 10 };
 
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${selectedMonth}_財務報表.csv`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+        if (detailRow % 2 === 0) {
+          row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+        }
+        detailRow++;
+      });
+
+      wsDetail.columns = [
+        { width: 14 },
+        { width: 16 },
+        { width: 30 },
+        { width: 16 }
+      ];
+
+      // 觸發下載 .xlsx
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `${selectedMonth}_財務報表.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     }
 
     // 初始化
