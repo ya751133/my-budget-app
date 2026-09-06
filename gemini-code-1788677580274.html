@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>預算記帳</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="預算記帳">
+  <style>
+    :root {
+      --primary: #2563eb;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --text: #0f172a;
+      --subtext: #64748b;
+    }
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { margin: 0; padding: 16px; background-color: var(--bg); color: var(--text); padding-bottom: 80px; }
+    h2, h3 { margin: 0 0 12px 0; }
+    .card { background: var(--card); border-radius: 16px; padding: 16px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    .row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .progress-bar-bg { width: 100%; height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; margin-top: 6px; }
+    .progress-bar-fill { height: 100%; width: 0%; border-radius: 4px; transition: width 0.3s; }
+    .input-group { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+    input, select, button { padding: 10px 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 15px; }
+    input, select { flex: 1; min-width: 120px; }
+    button { background: var(--primary); color: #fff; border: none; font-weight: 600; cursor: pointer; }
+    button.export-btn { background: #10b981; width: 100%; padding: 12px; margin-top: 8px; }
+    .category-item { border-bottom: 1px solid #f1f5f9; padding: 12px 0; }
+    .category-item:last-child { border-bottom: none; }
+    .amount-positive { color: #059669; font-weight: 600; }
+    .amount-negative { color: var(--danger); font-weight: 600; }
+  </style>
+</head>
+<body>
+
+  <!-- 月份與總預算設定 -->
+  <div class="card">
+    <div class="row">
+      <input type="month" id="currentMonth" onchange="switchMonth()">
+    </div>
+    <div class="row" style="margin-top: 12px;">
+      <label>每月總預算上限：</label>
+      <input type="number" id="totalBudgetInput" placeholder="例如: 30000" style="max-width: 140px;">
+      <button onclick="saveTotalBudget()">儲存</button>
+    </div>
+    <div class="row" style="margin-top: 16px;">
+      <span>總累計花費 / 上限</span>
+      <span id="totalSummary">NT$ 0 / NT$ 0</span>
+    </div>
+    <div class="progress-bar-bg">
+      <div id="totalProgressBar" class="progress-bar-fill"></div>
+    </div>
+    <div class="row" style="margin-top: 6px; font-size: 14px;">
+      <span>總剩餘可用：</span>
+      <span id="totalRemaining" class="amount-positive">NT$ 0</span>
+    </div>
+  </div>
+
+  <!-- 新增開支 -->
+  <div class="card">
+    <h3>新增開支</h3>
+    <div class="input-group">
+      <select id="expenseCategory"></select>
+      <input type="number" id="expenseAmount" placeholder="金額 (NT$)">
+    </div>
+    <div class="input-group">
+      <input type="text" id="expenseDesc" placeholder="備註（例如：午餐、捷運）">
+      <button onclick="addExpense()">記入花費</button>
+    </div>
+  </div>
+
+  <!-- 各細項進度與餘額 -->
+  <div class="card">
+    <div class="row">
+      <h3>各類別剩餘額度</h3>
+    </div>
+    <div id="categoryList"></div>
+
+    <hr style="border: 0; border-top: 1px solid #f1f5f9; margin: 16px 0;">
+
+    <!-- 新增自訂類別 -->
+    <div style="font-size: 14px; color: var(--subtext); margin-bottom: 6px;">新增自訂類別與預算</div>
+    <div class="input-group">
+      <input type="text" id="newCategoryName" placeholder="分類名稱 (如: 伙食)">
+      <input type="number" id="newCategoryLimit" placeholder="上限 (NT$)">
+      <button onclick="addCategory()">新增</button>
+    </div>
+  </div>
+
+  <!-- 報表匯出 -->
+  <div class="card">
+    <h3>報表導出</h3>
+    <p style="font-size: 13px; color: var(--subtext); margin: 4px 0 8px 0;">將目前月份所有細項花費記錄匯出為 CSV 試算表。</p>
+    <button class="export-btn" onclick="exportCSV()">匯出當月報表 (CSV)</button>
+  </div>
+
+  <script>
+    // 取得當前 YYYY-MM
+    const today = new Date();
+    let selectedMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+    document.getElementById('currentMonth').value = selectedMonth;
+
+    function getStorageKey(key) {
+      return `${selectedMonth}_${key}`;
+    }
+
+    function loadData() {
+      const budget = localStorage.getItem(getStorageKey('totalBudget')) || 0;
+      const categories = JSON.parse(localStorage.getItem(getStorageKey('categories')) || '[]');
+      const expenses = JSON.parse(localStorage.getItem(getStorageKey('expenses')) || '[]');
+
+      document.getElementById('totalBudgetInput').value = budget > 0 ? budget : '';
+
+      // 更新分類選單
+      const select = document.getElementById('expenseCategory');
+      select.innerHTML = '';
+      categories.forEach((cat, idx) => {
+        const opt = document.createElement('option');
+        opt.value = idx;
+        opt.textContent = cat.name;
+        select.appendChild(opt);
+      });
+
+      // 計算各類別開銷
+      const catSpent = {};
+      let totalSpent = 0;
+      expenses.forEach(e => {
+        catSpent[e.categoryIndex] = (catSpent[e.categoryIndex] || 0) + Number(e.amount);
+        totalSpent += Number(e.amount);
+      });
+
+      // 更新總覽
+      const totalRemaining = Number(budget) - totalSpent;
+      document.getElementById('totalSummary').innerText = `NT$ ${totalSpent.toLocaleString()} / NT$ ${Number(budget).toLocaleString()}`;
+      const totalRemSpan = document.getElementById('totalRemaining');
+      totalRemSpan.innerText = `NT$ ${totalRemaining.toLocaleString()}`;
+      totalRemSpan.className = totalRemaining >= 0 ? 'amount-positive' : 'amount-negative';
+
+      const totalRatio = budget > 0 ? Math.min((totalSpent / budget) * 100, 100) : 0;
+      const totalBar = document.getElementById('totalProgressBar');
+      totalBar.style.width = `${totalRatio}%`;
+      totalBar.style.background = totalSpent > budget ? 'var(--danger)' : 'var(--primary)';
+
+      // 渲染細項列表
+      const list = document.getElementById('categoryList');
+      list.innerHTML = '';
+      if (categories.length === 0) {
+        list.innerHTML = '<div style="color: var(--subtext); font-size: 14px;">尚未建立任何分類</div>';
+      }
+
+      categories.forEach((cat, idx) => {
+        const spent = catSpent[idx] || 0;
+        const remaining = Number(cat.limit) - spent;
+        const ratio = cat.limit > 0 ? Math.min((spent / cat.limit) * 100, 100) : 0;
+        const barColor = spent > cat.limit ? 'var(--danger)' : (ratio > 80 ? 'var(--warning)' : 'var(--primary)');
+
+        const div = document.createElement('div');
+        div.className = 'category-item';
+        div.innerHTML = `
+          <div class="row">
+            <strong>${cat.name}</strong>
+            <span style="font-size: 14px; color: var(--subtext)">上限: NT$ ${Number(cat.limit).toLocaleString()}</span>
+          </div>
+          <div class="row" style="font-size: 13px;">
+            <span>已花費: NT$ ${spent.toLocaleString()}</span>
+            <span>剩餘: <span class="${remaining >= 0 ? 'amount-positive' : 'amount-negative'}">NT$ ${remaining.toLocaleString()}</span></span>
+          </div>
+          <div class="progress-bar-bg">
+            <div class="progress-bar-fill" style="width: ${ratio}%; background: ${barColor};"></div>
+          </div>
+        `;
+        list.appendChild(div);
+      });
+    }
+
+    function switchMonth() {
+      selectedMonth = document.getElementById('currentMonth').value;
+      loadData();
+    }
+
+    function saveTotalBudget() {
+      const budget = document.getElementById('totalBudgetInput').value;
+      localStorage.setItem(getStorageKey('totalBudget'), budget);
+      loadData();
+    }
+
+    function addCategory() {
+      const name = document.getElementById('newCategoryName').value.trim();
+      const limit = document.getElementById('newCategoryLimit').value;
+      if (!name || !limit) return alert('請輸入完整分類名稱與上限');
+
+      const categories = JSON.parse(localStorage.getItem(getStorageKey('categories')) || '[]');
+      categories.push({ name, limit });
+      localStorage.setItem(getStorageKey('categories'), JSON.stringify(categories));
+
+      document.getElementById('newCategoryName').value = '';
+      document.getElementById('newCategoryLimit').value = '';
+      loadData();
+    }
+
+    function addExpense() {
+      const catIdx = document.getElementById('expenseCategory').value;
+      const amount = document.getElementById('expenseAmount').value;
+      const desc = document.getElementById('expenseDesc').value.trim();
+
+      if (catIdx === '' || !amount || Number(amount) <= 0) return alert('請選擇分類並輸入有效金額');
+
+      const expenses = JSON.parse(localStorage.getItem(getStorageKey('expenses')) || '[]');
+      expenses.push({
+        categoryIndex: catIdx,
+        amount: Number(amount),
+        desc: desc || '無備註',
+        date: new Date().toLocaleDateString('zh-TW')
+      });
+      localStorage.setItem(getStorageKey('expenses'), JSON.stringify(expenses));
+
+      document.getElementById('expenseAmount').value = '';
+      document.getElementById('expenseDesc').value = '';
+      loadData();
+    }
+
+    function exportCSV() {
+      const categories = JSON.parse(localStorage.getItem(getStorageKey('categories')) || '[]');
+      const expenses = JSON.parse(localStorage.getItem(getStorageKey('expenses')) || '[]');
+
+      if (expenses.length === 0) return alert('當月尚無任何花費記錄');
+
+      let csvContent = '\uFEFF日期,分類,備註,金額\n';
+      expenses.forEach(e => {
+        const catName = categories[e.categoryIndex] ? categories[e.categoryIndex].name : '未分類';
+        csvContent += `"${e.date}","${catName}","${e.desc}",${e.amount}\n`;
+      });
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.setAttribute('download', `${selectedMonth}_開支報表.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    // 初始化
+    loadData();
+  </script>
+</body>
+</html>
