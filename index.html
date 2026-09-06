@@ -3,36 +3,56 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>預算記帳</title>
+  <title>智慧預算記帳</title>
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="預算記帳">
   <style>
     :root {
-      --primary: #2563eb;
+      --primary: #3b82f6;
+      --primary-dark: #1d4ed8;
       --danger: #ef4444;
       --warning: #f59e0b;
-      --bg: #f8fafc;
+      --success: #10b981;
+      --bg: #f1f5f9;
       --card: #ffffff;
       --text: #0f172a;
       --subtext: #64748b;
+      --border: #e2e8f0;
     }
-    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    body { margin: 0; padding: 16px; background-color: var(--bg); color: var(--text); padding-bottom: 80px; }
-    h2, h3 { margin: 0 0 12px 0; }
-    .card { background: var(--card); border-radius: 16px; padding: 16px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
-    .row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-    .progress-bar-bg { width: 100%; height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; margin-top: 6px; }
-    .progress-bar-fill { height: 100%; width: 0%; border-radius: 4px; transition: width 0.3s; }
-    .input-group { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
-    input, select, button { padding: 10px 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 15px; }
-    input, select { flex: 1; min-width: 120px; }
-    button { background: var(--primary); color: #fff; border: none; font-weight: 600; cursor: pointer; }
-    button.export-btn { background: #10b981; width: 100%; padding: 12px; margin-top: 8px; }
-    .category-item { border-bottom: 1px solid #f1f5f9; padding: 12px 0; }
-    .category-item:last-child { border-bottom: none; }
-    .amount-positive { color: #059669; font-weight: 600; }
-    .amount-negative { color: var(--danger); font-weight: 600; }
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
+    body { margin: 0; padding: 16px; background-color: var(--bg); color: var(--text); padding-bottom: 90px; }
+    
+    .card { background: var(--card); border-radius: 18px; padding: 16px; margin-bottom: 14px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+    .row { display: flex; justify-content: space-between; align-items: center; }
+    
+    /* 進度條 */
+    .progress-bar-bg { width: 100%; height: 10px; background: #e2e8f0; border-radius: 6px; overflow: hidden; margin-top: 8px; }
+    .progress-bar-fill { height: 100%; width: 0%; border-radius: 6px; transition: width 0.3s ease; }
+    
+    /* 輸入框與基礎按鈕 */
+    input { padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border); font-size: 15px; width: 100%; outline: none; background: #f8fafc; }
+    input:focus { border-color: var(--primary); background: #fff; }
+    button.btn-main { background: var(--primary); color: #fff; border: none; border-radius: 10px; padding: 12px; font-weight: 600; font-size: 15px; width: 100%; cursor: pointer; }
+    button.btn-main:active { background: var(--primary-dark); }
+    
+    /* 日期快捷選鈕 */
+    .pill-group { display: flex; gap: 8px; margin-bottom: 12px; }
+    .pill-btn { flex: 1; padding: 9px 0; border: 1.5px solid var(--border); background: #fff; border-radius: 10px; font-size: 14px; font-weight: 500; text-align: center; color: var(--subtext); cursor: pointer; }
+    .pill-btn.active { border-color: var(--primary); background: #eff6ff; color: var(--primary); font-weight: 700; }
+    
+    /* 分類標籤按鈕區 */
+    .chip-grid { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 14px 0; }
+    .chip-btn { padding: 8px 14px; border: 1.5px solid var(--border); border-radius: 20px; font-size: 14px; background: #fff; color: var(--text); cursor: pointer; }
+    .chip-btn.active { border-color: var(--primary); background: var(--primary); color: #fff; font-weight: 600; }
+    
+    /* 明細列表 */
+    .expense-list-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); }
+    .expense-list-item:last-child { border-bottom: none; }
+    .del-btn { background: #fee2e2; color: var(--danger); border: none; border-radius: 6px; padding: 4px 8px; font-size: 12px; margin-left: 8px; cursor: pointer; }
+    
+    .amount-positive { color: var(--success); font-weight: 700; }
+    .amount-negative { color: var(--danger); font-weight: 700; }
   </style>
 </head>
 <body>
@@ -40,212 +60,319 @@
   <!-- 月份與總預算設定 -->
   <div class="card">
     <div class="row">
-      <input type="month" id="currentMonth" onchange="switchMonth()">
+      <h3 style="margin:0;">📅 月份</h3>
+      <input type="month" id="currentMonth" onchange="switchMonth()" style="width: auto;">
     </div>
-    <div class="row" style="margin-top: 12px;">
-      <label>每月總預算上限：</label>
-      <input type="number" id="totalBudgetInput" placeholder="例如: 30000" style="max-width: 140px;">
-      <button onclick="saveTotalBudget()">儲存</button>
+    
+    <div class="row" style="margin-top: 14px;">
+      <span style="font-size: 14px; color: var(--subtext);">當月總預算上限</span>
+      <div style="display: flex; gap: 6px; width: 55%;">
+        <input type="number" id="totalBudgetInput" placeholder="設定總額" style="padding: 6px 10px;">
+        <button onclick="saveTotalBudget()" style="border:none; background: var(--primary); color:#fff; border-radius: 8px; padding: 0 12px; font-size: 13px;">設定</button>
+      </div>
     </div>
-    <div class="row" style="margin-top: 16px;">
-      <span>總累計花費 / 上限</span>
-      <span id="totalSummary">NT$ 0 / NT$ 0</span>
+
+    <div class="row" style="margin-top: 14px; font-size: 14px;">
+      <span>已花費 / 預算</span>
+      <span id="totalSummary" style="font-weight: 600;">NT$ 0 / NT$ 0</span>
     </div>
     <div class="progress-bar-bg">
       <div id="totalProgressBar" class="progress-bar-fill"></div>
     </div>
-    <div class="row" style="margin-top: 6px; font-size: 14px;">
-      <span>總剩餘可用：</span>
+    <div class="row" style="margin-top: 8px; font-size: 14px;">
+      <span>本月剩餘額度：</span>
       <span id="totalRemaining" class="amount-positive">NT$ 0</span>
     </div>
   </div>
 
-  <!-- 新增開支 -->
+  <!-- 新增消費區塊 -->
   <div class="card">
-    <h3>新增開支</h3>
-    <div class="input-group">
-      <select id="expenseCategory"></select>
-      <input type="number" id="expenseAmount" placeholder="金額 (NT$)">
+    <h3 style="margin:0 0 12px 0;">記一筆開支</h3>
+
+    <!-- 日期選擇按鈕 -->
+    <div class="pill-group">
+      <div class="pill-btn active" id="date-today" onclick="setDateOption('today')">今天</div>
+      <div class="pill-btn" id="date-yesterday" onclick="setDateOption('yesterday')">昨天</div>
+      <div class="pill-btn" id="date-custom" onclick="setDateOption('custom')">其他日期</div>
     </div>
-    <div class="input-group">
-      <input type="text" id="expenseDesc" placeholder="備註（例如：午餐、捷運）">
-      <button onclick="addExpense()">記入花費</button>
+    <div id="customDateContainer" style="display: none; margin-bottom: 12px;">
+      <input type="date" id="customDateInput" onchange="applyCustomDate()">
+    </div>
+
+    <!-- 快速點選分類按鈕 -->
+    <div style="font-size: 13px; color: var(--subtext);">選擇消費類別：</div>
+    <div class="chip-grid" id="categoryChips"></div>
+
+    <!-- 金額與備註 -->
+    <div style="display: flex; gap: 8px; margin-bottom: 10px;">
+      <input type="number" id="expenseAmount" placeholder="金額 (NT$)" inputmode="numeric" style="flex: 1.2;">
+      <input type="text" id="expenseDesc" placeholder="備註 (例如: 麥當勞)" style="flex: 1.8;">
+    </div>
+    <button class="btn-main" onclick="addExpense()">確認記入</button>
+  </div>
+
+  <!-- 分類額度即時監控 -->
+  <div class="card">
+    <h3 style="margin:0 0 12px 0;">各類別剩餘額度</h3>
+    <div id="categoryProgressList"></div>
+
+    <!-- 快速新增分類 -->
+    <div style="margin-top: 16px; padding-top: 12px; border-top: 1px dashed var(--border);">
+      <div style="font-size: 13px; color: var(--subtext); margin-bottom: 6px;">＋ 新增類別與預算</div>
+      <div style="display: flex; gap: 6px;">
+        <input type="text" id="newCatName" placeholder="名稱 (如: 交通)">
+        <input type="number" id="newCatLimit" placeholder="預算上限">
+        <button onclick="addNewCategory()" style="border:none; background:#0f172a; color:#fff; border-radius: 8px; padding: 0 14px; font-size: 13px;">新增</button>
+      </div>
     </div>
   </div>
 
-  <!-- 各細項進度與餘額 -->
+  <!-- 明細與報表 -->
   <div class="card">
-    <div class="row">
-      <h3>各類別剩餘額度</h3>
+    <div class="row" style="margin-bottom: 10px;">
+      <h3 style="margin:0;">本月開銷明細</h3>
+      <button onclick="exportFullReport()" style="background: var(--success); color:#fff; border:none; border-radius: 8px; padding: 6px 12px; font-size: 13px; font-weight: 600;">📊 匯出完整報表</button>
     </div>
-    <div id="categoryList"></div>
-
-    <hr style="border: 0; border-top: 1px solid #f1f5f9; margin: 16px 0;">
-
-    <!-- 新增自訂類別 -->
-    <div style="font-size: 14px; color: var(--subtext); margin-bottom: 6px;">新增自訂類別與預算</div>
-    <div class="input-group">
-      <input type="text" id="newCategoryName" placeholder="分類名稱 (如: 伙食)">
-      <input type="number" id="newCategoryLimit" placeholder="上限 (NT$)">
-      <button onclick="addCategory()">新增</button>
-    </div>
-  </div>
-
-  <!-- 報表匯出 -->
-  <div class="card">
-    <h3>報表導出</h3>
-    <p style="font-size: 13px; color: var(--subtext); margin: 4px 0 8px 0;">將目前月份所有細項花費記錄匯出為 CSV 試算表。</p>
-    <button class="export-btn" onclick="exportCSV()">匯出當月報表 (CSV)</button>
+    <div id="recentExpenseList"></div>
   </div>
 
   <script>
-    // 取得當前 YYYY-MM
-    const today = new Date();
-    let selectedMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+    const todayObj = new Date();
+    let selectedMonth = `${todayObj.getFullYear()}-${String(todayObj.getMonth() + 1).padStart(2, '0')}`;
+    let selectedDate = formatDate(todayObj);
+    let selectedCategoryIdx = null;
+
     document.getElementById('currentMonth').value = selectedMonth;
 
-    function getStorageKey(key) {
-      return `${selectedMonth}_${key}`;
+    function formatDate(d) {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
     }
 
-    function loadData() {
-      const budget = localStorage.getItem(getStorageKey('totalBudget')) || 0;
-      const categories = JSON.parse(localStorage.getItem(getStorageKey('categories')) || '[]');
-      const expenses = JSON.parse(localStorage.getItem(getStorageKey('expenses')) || '[]');
+    function getKey(name) { return `${selectedMonth}_${name}`; }
+
+    // 日期快捷按鈕切換
+    function setDateOption(type) {
+      document.querySelectorAll('.pill-btn').forEach(btn => btn.classList.remove('active'));
+      const customContainer = document.getElementById('customDateContainer');
+
+      if (type === 'today') {
+        document.getElementById('date-today').classList.add('active');
+        customContainer.style.display = 'none';
+        selectedDate = formatDate(new Date());
+      } else if (type === 'yesterday') {
+        document.getElementById('date-yesterday').classList.add('active');
+        customContainer.style.display = 'none';
+        const d = new Date();
+        d.setDate(d.getDate() - 1);
+        selectedDate = formatDate(d);
+      } else {
+        document.getElementById('date-custom').classList.add('active');
+        customContainer.style.display = 'block';
+        const customInput = document.getElementById('customDateInput');
+        if (!customInput.value) customInput.value = formatDate(new Date());
+        selectedDate = customInput.value;
+      }
+    }
+
+    function applyCustomDate() {
+      selectedDate = document.getElementById('customDateInput').value;
+    }
+
+    // 核心數據讀取與畫面渲染
+    function loadDashboard() {
+      const budget = localStorage.getItem(getKey('budget')) || 0;
+      const categories = JSON.parse(localStorage.getItem(getKey('categories')) || '[]');
+      const expenses = JSON.parse(localStorage.getItem(getKey('expenses')) || '[]');
 
       document.getElementById('totalBudgetInput').value = budget > 0 ? budget : '';
 
-      // 更新分類選單
-      const select = document.getElementById('expenseCategory');
-      select.innerHTML = '';
-      categories.forEach((cat, idx) => {
-        const opt = document.createElement('option');
-        opt.value = idx;
-        opt.textContent = cat.name;
-        select.appendChild(opt);
-      });
-
-      // 計算各類別開銷
+      // 計算各分類花費與總花費
       const catSpent = {};
       let totalSpent = 0;
       expenses.forEach(e => {
-        catSpent[e.categoryIndex] = (catSpent[e.categoryIndex] || 0) + Number(e.amount);
+        catSpent[e.catIdx] = (catSpent[e.catIdx] || 0) + Number(e.amount);
         totalSpent += Number(e.amount);
       });
 
-      // 更新總覽
-      const totalRemaining = Number(budget) - totalSpent;
+      // 總進度條與餘額更新
+      const remaining = Number(budget) - totalSpent;
       document.getElementById('totalSummary').innerText = `NT$ ${totalSpent.toLocaleString()} / NT$ ${Number(budget).toLocaleString()}`;
-      const totalRemSpan = document.getElementById('totalRemaining');
-      totalRemSpan.innerText = `NT$ ${totalRemaining.toLocaleString()}`;
-      totalRemSpan.className = totalRemaining >= 0 ? 'amount-positive' : 'amount-negative';
+      const remEl = document.getElementById('totalRemaining');
+      remEl.innerText = `NT$ ${remaining.toLocaleString()}`;
+      remEl.className = remaining >= 0 ? 'amount-positive' : 'amount-negative';
 
-      const totalRatio = budget > 0 ? Math.min((totalSpent / budget) * 100, 100) : 0;
+      const ratio = budget > 0 ? Math.min((totalSpent / budget) * 100, 100) : 0;
       const totalBar = document.getElementById('totalProgressBar');
-      totalBar.style.width = `${totalRatio}%`;
+      totalBar.style.width = `${ratio}%`;
       totalBar.style.background = totalSpent > budget ? 'var(--danger)' : 'var(--primary)';
 
-      // 渲染細項列表
-      const list = document.getElementById('categoryList');
-      list.innerHTML = '';
+      // 渲染分類按鈕
+      const chips = document.getElementById('categoryChips');
+      chips.innerHTML = '';
       if (categories.length === 0) {
-        list.innerHTML = '<div style="color: var(--subtext); font-size: 14px;">尚未建立任何分類</div>';
+        chips.innerHTML = '<span style="font-size:13px; color:var(--subtext);">請先在下方新增分類</span>';
+        selectedCategoryIdx = null;
+      } else {
+        categories.forEach((cat, idx) => {
+          const btn = document.createElement('div');
+          btn.className = `chip-btn ${selectedCategoryIdx === idx ? 'active' : ''}`;
+          btn.innerText = cat.name;
+          btn.onclick = () => {
+            selectedCategoryIdx = idx;
+            loadDashboard();
+          };
+          chips.appendChild(btn);
+        });
       }
 
+      // 渲染各分類即時額度進度
+      const progList = document.getElementById('categoryProgressList');
+      progList.innerHTML = '';
       categories.forEach((cat, idx) => {
         const spent = catSpent[idx] || 0;
-        const remaining = Number(cat.limit) - spent;
-        const ratio = cat.limit > 0 ? Math.min((spent / cat.limit) * 100, 100) : 0;
-        const barColor = spent > cat.limit ? 'var(--danger)' : (ratio > 80 ? 'var(--warning)' : 'var(--primary)');
+        const left = Number(cat.limit) - spent;
+        const catRatio = cat.limit > 0 ? Math.min((spent / cat.limit) * 100, 100) : 0;
+        const color = spent > cat.limit ? 'var(--danger)' : (catRatio > 80 ? 'var(--warning)' : 'var(--primary)');
 
-        const div = document.createElement('div');
-        div.className = 'category-item';
-        div.innerHTML = `
-          <div class="row">
+        const item = document.createElement('div');
+        item.style.marginBottom = '12px';
+        item.innerHTML = `
+          <div class="row" style="font-size: 14px;">
             <strong>${cat.name}</strong>
-            <span style="font-size: 14px; color: var(--subtext)">上限: NT$ ${Number(cat.limit).toLocaleString()}</span>
-          </div>
-          <div class="row" style="font-size: 13px;">
-            <span>已花費: NT$ ${spent.toLocaleString()}</span>
-            <span>剩餘: <span class="${remaining >= 0 ? 'amount-positive' : 'amount-negative'}">NT$ ${remaining.toLocaleString()}</span></span>
+            <span>剩餘: <span class="${left >= 0 ? 'amount-positive' : 'amount-negative'}">NT$ ${left.toLocaleString()}</span></span>
           </div>
           <div class="progress-bar-bg">
-            <div class="progress-bar-fill" style="width: ${ratio}%; background: ${barColor};"></div>
+            <div class="progress-bar-fill" style="width: ${catRatio}%; background: ${color};"></div>
+          </div>
+          <div class="row" style="font-size: 11px; color: var(--subtext); margin-top: 3px;">
+            <span>已付: NT$ ${spent.toLocaleString()}</span>
+            <span>上限: NT$ ${Number(cat.limit).toLocaleString()}</span>
           </div>
         `;
-        list.appendChild(div);
+        progList.appendChild(item);
       });
+
+      // 渲染明細清單（最新至最舊）
+      const listEl = document.getElementById('recentExpenseList');
+      listEl.innerHTML = '';
+      if (expenses.length === 0) {
+        listEl.innerHTML = '<div style="color:var(--subtext); font-size:13px; text-align:center; padding: 12px 0;">當月尚無任何花費記錄</div>';
+      } else {
+        expenses.slice().reverse().forEach((e, revIdx) => {
+          const actualIdx = expenses.length - 1 - revIdx;
+          const catName = categories[e.catIdx] ? categories[e.catIdx].name : '未知類別';
+          const row = document.createElement('div');
+          row.className = 'expense-list-item';
+          row.innerHTML = `
+            <div>
+              <div style="font-weight:600; font-size:14px;">${catName} - NT$ ${Number(e.amount).toLocaleString()}</div>
+              <div style="font-size:12px; color:var(--subtext);">${e.date} ｜ ${e.desc}</div>
+            </div>
+            <div>
+              <button class="del-btn" onclick="deleteExpense(${actualIdx})">刪除</button>
+            </div>
+          `;
+          listEl.appendChild(row);
+        });
+      }
     }
 
+    // 業務動作
     function switchMonth() {
       selectedMonth = document.getElementById('currentMonth').value;
-      loadData();
+      selectedCategoryIdx = null;
+      loadDashboard();
     }
 
     function saveTotalBudget() {
       const budget = document.getElementById('totalBudgetInput').value;
-      localStorage.setItem(getStorageKey('totalBudget'), budget);
-      loadData();
+      if (!budget || budget <= 0) return alert('請輸入有效預算金額');
+      localStorage.setItem(getKey('budget'), budget);
+      loadDashboard();
     }
 
-    function addCategory() {
-      const name = document.getElementById('newCategoryName').value.trim();
-      const limit = document.getElementById('newCategoryLimit').value;
-      if (!name || !limit) return alert('請輸入完整分類名稱與上限');
+    function addNewCategory() {
+      const name = document.getElementById('newCatName').value.trim();
+      const limit = document.getElementById('newCatLimit').value;
+      if (!name || !limit) return alert('請填寫類別名稱與預算');
 
-      const categories = JSON.parse(localStorage.getItem(getStorageKey('categories')) || '[]');
-      categories.push({ name, limit });
-      localStorage.setItem(getStorageKey('categories'), JSON.stringify(categories));
+      const cats = JSON.parse(localStorage.getItem(getKey('categories')) || '[]');
+      cats.push({ name, limit });
+      localStorage.setItem(getKey('categories'), JSON.stringify(cats));
 
-      document.getElementById('newCategoryName').value = '';
-      document.getElementById('newCategoryLimit').value = '';
-      loadData();
+      document.getElementById('newCatName').value = '';
+      document.getElementById('newCatLimit').value = '';
+      if (selectedCategoryIdx === null) selectedCategoryIdx = cats.length - 1;
+      loadDashboard();
     }
 
     function addExpense() {
-      const catIdx = document.getElementById('expenseCategory').value;
+      if (selectedCategoryIdx === null) return alert('請點擊選擇消費分類');
       const amount = document.getElementById('expenseAmount').value;
       const desc = document.getElementById('expenseDesc').value.trim();
+      if (!amount || Number(amount) <= 0) return alert('請輸入有效金額');
 
-      if (catIdx === '' || !amount || Number(amount) <= 0) return alert('請選擇分類並輸入有效金額');
-
-      const expenses = JSON.parse(localStorage.getItem(getStorageKey('expenses')) || '[]');
+      const expenses = JSON.parse(localStorage.getItem(getKey('expenses')) || '[]');
       expenses.push({
-        categoryIndex: catIdx,
+        catIdx: selectedCategoryIdx,
         amount: Number(amount),
-        desc: desc || '無備註',
-        date: new Date().toLocaleDateString('zh-TW')
+        desc: desc || '日常開銷',
+        date: selectedDate
       });
-      localStorage.setItem(getStorageKey('expenses'), JSON.stringify(expenses));
+      localStorage.setItem(getKey('expenses'), JSON.stringify(expenses));
 
       document.getElementById('expenseAmount').value = '';
       document.getElementById('expenseDesc').value = '';
-      loadData();
+      loadDashboard();
     }
 
-    function exportCSV() {
-      const categories = JSON.parse(localStorage.getItem(getStorageKey('categories')) || '[]');
-      const expenses = JSON.parse(localStorage.getItem(getStorageKey('expenses')) || '[]');
+    function deleteExpense(idx) {
+      if (!confirm('確定刪除這筆開支嗎？')) return;
+      const expenses = JSON.parse(localStorage.getItem(getKey('expenses')) || '[]');
+      expenses.splice(idx, 1);
+      localStorage.setItem(getKey('expenses'), JSON.stringify(expenses));
+      loadDashboard();
+    }
 
-      if (expenses.length === 0) return alert('當月尚無任何花費記錄');
+    // 輸出報表
+    function exportFullReport() {
+      const categories = JSON.parse(localStorage.getItem(getKey('categories')) || '[]');
+      const expenses = JSON.parse(localStorage.getItem(getKey('expenses')) || '[]');
+      const budget = localStorage.getItem(getKey('budget')) || 0;
 
-      let csvContent = '\uFEFF日期,分類,備註,金額\n';
+      if (expenses.length === 0) return alert('本月尚無任何紀錄可匯出');
+
+      let csv = '\uFEFF'; // UTF-8 BOM 防止亂碼
+      csv += `【${selectedMonth} 預算開銷報表】\n`;
+      csv += `總預算,NT$ ${budget}\n\n`;
+
+      csv += `--- 消費明細清單 ---\n`;
+      csv += `日期,分類,備註,金額\n`;
+      let total = 0;
       expenses.forEach(e => {
-        const catName = categories[e.categoryIndex] ? categories[e.categoryIndex].name : '未分類';
-        csvContent += `"${e.date}","${catName}","${e.desc}",${e.amount}\n`;
+        const catName = categories[e.catIdx] ? categories[e.catIdx].name : '未知';
+        csv += `"${e.date}","${catName}","${e.desc}",${e.amount}\n`;
+        total += Number(e.amount);
       });
 
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.setAttribute('download', `${selectedMonth}_開支報表.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      csv += `\n總累計支出,,NT$ ${total}\n`;
+      csv += `本月淨剩餘,,NT$ ${budget - total}\n`;
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${selectedMonth}_開支財務報表.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
     }
 
     // 初始化
-    loadData();
+    loadDashboard();
   </script>
 </body>
 </html>
